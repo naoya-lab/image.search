@@ -1,6 +1,6 @@
 # Imaging Assist
 
-CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補を表示するUIの試作です。通常のキーワード検索とOCRはブラウザ内で処理します。任意のAI表記整理機能には、別途Cloudflare WorkerとOpenAI APIの設定が必要です。
+CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補を表示するUIの試作です。通常のキーワード検索とOCRはブラウザ内で処理します。任意のAI表記整理機能には、別途Cloudflare WorkerとGemini APIの設定が必要です。
 
 ## 起動
 
@@ -25,19 +25,19 @@ CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補
 
 ## AI表記整理の設定（任意）
 
-GitHub Pagesは静的サイトです。OpenAI APIキーをHTMLやブラウザ設定に書くと公開されるため、Cloudflare Workerを中継に使います。WorkerのキーはCloudflare Secretに保管し、ブラウザには渡しません。APIの構造化出力で登録語との対応だけを受け取り、Workerとブラウザの両方で許可語と入力文字列を検証します。
+GitHub Pagesは静的サイトです。Gemini APIキーをHTMLやブラウザ設定に書くと公開されるため、Cloudflare Workerを中継に使います。WorkerのキーはCloudflare Secretに保管し、ブラウザには渡しません。APIの構造化出力で登録語との対応だけを受け取り、Workerとブラウザの両方で許可語と入力文字列を検証します。
 
 ### Workerの初回デプロイ
 
 1. OpenAIのAPIキーを用意します。キーはGitHubへ登録・貼り付けしないでください。
-2. Node.jsをインストールした端末でこのリポジトリを取得し、ターミナルで `ai-worker` フォルダへ移動します。
+2. Google AI StudioでGemini APIキーを作成します。Cloudflare WorkerのSecret名は `GEMINI_API_KEY` にしてください（既存Secretが `OPENAI_API_KEY` という名前の場合、Workerからは読み取れません）。Node.jsをインストールした端末でこのリポジトリを取得し、ターミナルで `ai-worker` フォルダへ移動します。
 3. 次を順に実行します。
 
    ```sh
    npm install
    npx wrangler login
    npx wrangler deploy
-   npx wrangler secret put OPENAI_API_KEY
+   npx wrangler secret put GEMINI_API_KEY
    ```
 
    `secret put` の入力待ちになったらAPIキーを貼り付けます。WorkerのURLは `npx wrangler deploy` の出力に表示されます。初回のデプロイ直後、Secretを登録するまではAI機能は使えません。
@@ -50,7 +50,7 @@ GitHub Pagesは静的サイトです。OpenAI APIキーをHTMLやブラウザ設
 - AIへ送るのは依頼文テキストです。画像ファイルやOCR元画像は送信しません。AI処理を実行するたびに確認ダイアログを表示します。
 - AIは同義語・略語・表記差の候補を返します。否定表現や文脈の判定は完全ではないため、AIが「否定・既往など文脈が曖昧な語は除外」と指示されていても、利用者が原文を確認してください。
 - Workerの許可語は `ai-worker/src/index.js` の `CANONICAL_TERMS`、画面側は `index.html` の `rules[].trigger` です。ルール追加時は両方を同期してください。テスト `cd ai-worker && npm test` で不一致を検出します。
-- AI利用にはOpenAI API契約と利用料金が発生する場合があります。モデル名はWorker内の `model` で管理します。
+- Gemini APIの利用条件・クォータ・料金はGoogle AI Studio側で確認してください。モデル名は `ai-worker/src/index.js` のGemini API URLで指定しています。
 
 ## 参照資料の扱い
 
@@ -74,6 +74,6 @@ OCRはTesseract.js 6.0.1をブラウザで利用します。初回はライブ�
 
 - Tesseract.js: https://github.com/naptha/tesseract.js
 - MDN `getUserMedia()`: https://developer.mozilla.org/ja/docs/Web/API/MediaDevices/getUserMedia
-- OpenAI Structured Outputs: https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
+- Gemini structured output: https://ai.google.dev/gemini-api/docs/structured-output
 - Cloudflare Workers Secrets: https://developers.cloudflare.com/workers/configuration/secrets/
 - Cloudflare Workers Rate Limiting: https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
