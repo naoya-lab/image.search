@@ -1,10 +1,10 @@
 # Imaging Assist
 
-CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補を表示する静的UIの試作です。
+CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補を表示するUIの試作です。通常のキーワード検索とOCRはブラウザ内で処理します。任意のAI表記整理機能には、別途Cloudflare WorkerとOpenAI APIの設定が必要です。
 
 ## 起動
 
-`index.html` をブラウザで開きます。サーバーや外部APIは使いません。
+`index.html` をブラウザで開きます。通常のキーワード検索・OCRにサーバーは不要です。AI表記整理は下記のWorker設定後に使えます。
 
 ## 現在の動作
 
@@ -17,10 +17,40 @@ CT・MRIの依頼文をもとに、病態と撮影プロトコルの確認候補
 - OCR結果を依頼文欄へ反映し、利用者が確認・修正してから解析
 - カメラは操作時だけ起動し、撮影後または画面を離れると停止
 - 読み込んだ画像をサーバーへ送らない（OCRエンジンと日本語データは初回にCDNから取得）
+- 任意のAI表記整理：登録済みトリガー用語への言い換え案を提示し、利用者が選んだ語だけを候補検索へ追加（依頼文原文は変更しない）
 
 ## 大切な制約
 
-この試作はキーワード一致による参考表示のみで、診断支援や検査・条件の自動決定を行うものではありません。表示ルールはガイドラインの網羅的な実装ではなく、部位によって未登録のものがあります。OCRは誤読することがあり、特に手書き文字や画質の低い画像では原文照合が必要です。候補の網羅性や安全性は検証されていません。実運用には、施設承認済みプロトコル、根拠文献、禁忌・緊急時確認、臨床安全性の検証が必要です。実在患者の個人情報は入力しないでください。
+この試作はキーワード一致による参考表示のみで、診断支援や検査・条件の自動決定を行うものではありません。AIは登録済み用語への言い換え案だけを作りますが、誤対応・見逃しがありえます。提案は自動適用されず、原文を確認して利用者が選択します。AI機能を使う場合、依頼文テキストは設定した外部AIサービスへ送信されます。患者氏名・IDなどの個人情報は送信しないでください。入力内容はこのアプリ内では保存しませんが、外部サービスの取り扱いは各サービスの契約・設定に従います。表示ルールはガイドラインの網羅的な実装ではなく、部位によって未登録のものがあります。OCRは誤読することがあり、原文照合が必要です。候補の網羅性や安全性は検証されていません。実運用には、施設承認済みプロトコル、根拠文献、禁忌・緊急時確認、臨床安全性と情報管理の検証が必要です。
+
+## AI表記整理の設定（任意）
+
+GitHub Pagesは静的サイトです。OpenAI APIキーをHTMLやブラウザ設定に書くと公開されるため、Cloudflare Workerを中継に使います。WorkerのキーはCloudflare Secretに保管し、ブラウザには渡しません。APIの構造化出力で登録語との対応だけを受け取り、Workerとブラウザの両方で許可語と入力文字列を検証します。
+
+### Workerの初回デプロイ
+
+1. OpenAIのAPIキーを用意します。キーはGitHubへ登録・貼り付けしないでください。
+2. Node.jsをインストールした端末でこのリポジトリを取得し、ターミナルで `ai-worker` フォルダへ移動します。
+3. 次を順に実行します。
+
+   ```sh
+   npm install
+   npx wrangler login
+   npx wrangler deploy
+   npx wrangler secret put OPENAI_API_KEY
+   ```
+
+   `secret put` の入力待ちになったらAPIキーを貼り付けます。WorkerのURLは `npx wrangler deploy` の出力に表示されます。初回のデプロイ直後、Secretを登録するまではAI機能は使えません。
+
+4. 公開アプリの「依頼内容を入力」欄にある「AI表記整理の接続設定」を開き、WorkerのベースURL（末尾に `/normalize` を付けない）を入力して保存します。通常のキーワード検索はWorkerなしでも利用できます。
+
+### 制限・更新
+
+- Workerは `https://naoya-lab.github.io` からのブラウザ通信だけを許可し、1 IPあたり毎分10回に制限します。CloudflareのRate Limitingは補助策で、利用者認証や医療情報のアクセス制御の代わりにはなりません。公開利用の前にCloudflare側の利用量・アラートも設定してください。
+- AIへ送るのは依頼文テキストです。画像ファイルやOCR元画像は送信しません。AI処理を実行するたびに確認ダイアログを表示します。
+- AIは同義語・略語・表記差の候補を返します。否定表現や文脈の判定は完全ではないため、AIが「否定・既往など文脈が曖昧な語は除外」と指示されていても、利用者が原文を確認してください。
+- Workerの許可語は `ai-worker/src/index.js` の `CANONICAL_TERMS`、画面側は `index.html` の `rules[].trigger` です。ルール追加時は両方を同期してください。テスト `cd ai-worker && npm test` で不一致を検出します。
+- AI利用にはOpenAI API契約と利用料金が発生する場合があります。モデル名はWorker内の `model` で管理します。
 
 ## 参照資料の扱い
 
@@ -44,3 +74,6 @@ OCRはTesseract.js 6.0.1をブラウザで利用します。初回はライブ�
 
 - Tesseract.js: https://github.com/naptha/tesseract.js
 - MDN `getUserMedia()`: https://developer.mozilla.org/ja/docs/Web/API/MediaDevices/getUserMedia
+- OpenAI Structured Outputs: https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
+- Cloudflare Workers Secrets: https://developers.cloudflare.com/workers/configuration/secrets/
+- Cloudflare Workers Rate Limiting: https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
