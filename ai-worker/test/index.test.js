@@ -19,7 +19,7 @@ test('rejects origins outside the configured GitHub Pages origin', async () => {
   assert.equal(response.status, 403);
 });
 
-test('returns only allowlisted terms and source phrases present in the input', async (t) => {
+test('returns normalized terms beyond the fixed vocabulary only for source phrases present in the input', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url, options) => {
@@ -28,16 +28,29 @@ test('returns only allowlisted terms and source phrases present in the input', a
     const body = JSON.parse(options.body);
     assert.equal(body.generationConfig.responseMimeType, 'application/json');
     assert.deepEqual(body.generationConfig.responseSchema.required, ['matches']);
+    assert.equal(CANONICAL_TERMS.has('胃部不快感'), false);
     return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ matches: [
       { sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' },
       { sourcePhrase: 'ここにない語', canonicalTerm: '脳卒中' },
-      { sourcePhrase: '頭痛', canonicalTerm: '未知の用語' },
+      { sourcePhrase: '頭痛', canonicalTerm: '胃部不快感' },
     ] }) }] } }] });
   };
 
   const response = await worker.fetch(makeRequest({ text: 'ろれつが回らないため受診。' }), makeEnv());
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { matches: [{ sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' }] });
+  assert.deepEqual(await response.json(), { matches: [
+    { sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' },
+    { sourcePhrase: '頭痛', canonicalTerm: '胃部不快感' },
+  ] });
+});
+
+test('explains an upstream 503 as temporary unavailability', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => new Response('unavailable', { status: 503 });
+  const response = await worker.fetch(makeRequest({ text: '頭痛' }), makeEnv());
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).error, /一時的に利用できません/);
 });
 
 test('requires a Gemini key in the Worker secret', async () => {
