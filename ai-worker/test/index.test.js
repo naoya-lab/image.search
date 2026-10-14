@@ -73,6 +73,28 @@ test('applies the configured per-IP rate limit', async () => {
   assert.equal(response.status, 429);
 });
 
+
+test('transcribes an image through Gemini without returning an interpretation', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /generativelanguage\\.googleapis\\.com\\/v1beta\\/models\\/gemini-3\\.1-flash-lite:generateContent$/);
+    assert.equal(options.headers['x-goog-api-key'], 'test-key');
+    const body = JSON.parse(options.body);
+    assert.match(body.systemInstruction.parts[0].text, /文字起こし/);
+    assert.deepEqual(body.contents[0].parts[1].inline_data, { mime_type: 'image/jpeg', data: 'aGVsbG8=' });
+    return Response.json({ candidates: [{ content: { parts: [{ text: '依頼文\\n頭痛あり' }] } }] });
+  };
+  const response = await worker.fetch(makeRequest({ imageBase64: 'aGVsbG8=', mimeType: 'image/jpeg' }, { path: '/transcribe' }), makeEnv());
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { text: '依頼文\\n頭痛あり' });
+});
+
+test('rejects unsupported image mime types before calling Gemini', async () => {
+  const response = await worker.fetch(makeRequest({ imageBase64: 'aGVsbG8=', mimeType: 'text/plain' }, { path: '/transcribe' }), makeEnv());
+  assert.equal(response.status, 400);
+});
+
 test('answers preflight requests with the allowed origin', async () => {
   const response = await worker.fetch(makeRequest({}, { method: 'OPTIONS' }), makeEnv());
   assert.equal(response.status, 204);
