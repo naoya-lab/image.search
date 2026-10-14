@@ -87,6 +87,7 @@ export const CANONICAL_TERMS = new Set([
   '腰坐骨神経痛',
   '下肢しびれ',
   '腰から足にかけての痛み',
+  '下肢のしびれ',
 ]);
 
 const corsHeaders = (origin) => ({
