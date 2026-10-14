@@ -50,7 +50,7 @@
         <p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
         <p class="scan-note">OCRはこの端末のブラウザ内で行い、画像を送信しません。初回はOCRエンジンと日本語データをCDNから読み込みます。読み取り間違いがあるため、結果を必ず原文と照合してください。</p>
         <details class="ai-settings"><summary>AI表記整理の接続設定</summary><label for="aiEndpoint">AI WorkerのベースURL</label><input id="aiEndpoint" type="url" inputmode="url" placeholder="https://your-worker.example.workers.dev" autocomplete="url"><span class="hint">Workerを設定後、ベースURLを保存してください。APIキーはここにもブラウザにも入力しません。</span><div class="scan-actions"><button class="secondary" id="saveAiEndpoint" type="button">URLを保存</button><span class="scan-note" id="aiConfigStatus" role="status"></span></div></details>
-        <div class="scan-actions"><button class="secondary" id="normalizeAi" type="button">AIで登録用語への言い換えを提案</button><span class="hint">選択・確認後に候補検索へ反映</span></div>
+        <div class="scan-actions"><button class="secondary" id="normalizeAi" type="button">Geminiで検索用語を抽出・言い換え</button><span class="hint">選択・確認後に候補検索へ反映</span></div>
         <p class="scan-note">AIを使うと依頼文テキストが設定した外部AIサービスへ送信されます。実患者の氏名・IDなどは入力せず、送信前に匿名化してください。AI案は自動適用されません。</p>
         <details class="facility-settings" id="facilitySettings">
           <summary>施設プロトコルを登録（このブラウザ内）</summary>
@@ -73,7 +73,7 @@
           </form>
           <div id="facilityProtocolList" class="facility-list"></div>
         </details>
-        <section class="ai-review hidden" id="aiReview" aria-live="polite"><h3>AIの言い換え案</h3><p class="scan-note">原文と見比べ、候補検索に使う案だけ選択してください。AIは病態や検査を判断しません。</p><div id="aiOptions"></div><div class="scan-actions"><button class="primary" id="applyAiTerms" type="button">選択した用語で候補を更新</button><button class="secondary" id="discardAiTerms" type="button">案を破棄</button></div></section>
+        <section class="ai-review hidden" id="aiReview" aria-live="polite"><h3>Geminiの検索用語案</h3><p class="scan-note">固定登録語以外の標準用語も提案します。原文と見比べ、候補検索に使う案だけ選択してください。AIは病態や検査を判断しません。</p><div id="aiOptions"></div><div class="scan-actions"><button class="primary" id="applyAiTerms" type="button">選択した用語で候補を更新</button><button class="secondary" id="discardAiTerms" type="button">案を破棄</button></div></section>
         <div class="examples"><button class="chip" data-example="突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。">急な神経症状</button><button class="chip" data-example="転倒後の頭痛。頭部打撲、頭蓋内出血の有無を確認。">頭部打撲</button><button class="chip" data-example="腰痛と右下肢痛。下肢のしびれあり。">腰痛・下肢痛</button><button class="chip" data-example="右季肋部痛と発熱。胆道系感染症疑い。">腹痛・発熱</button></div>
         <div class="actions"><button class="primary" id="analyze">候補を整理する <span aria-hidden="true">→</span></button><button class="secondary" id="clear">クリア</button><span class="privacy">通常の候補検索は端末内で処理</span></div>
       </article>
@@ -6256,8 +6256,8 @@
     function analyzeIfReady(){if(request.value.trim())analyze()}
     function renderAiSuggestions(items){
       aiOptions.replaceChildren();
-      if(!items.length){const message=document.createElement('p');message.className='empty';message.textContent='登録用語へ安全に対応づけられる明確な言い換えはありませんでした。';aiOptions.append(message);return}
-      items.forEach((item,index)=>{const label=document.createElement('label');label.className='ai-option';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(index);const content=document.createElement('span');content.append(document.createTextNode(`${item.sourcePhrase} → ${item.canonicalTerm}`));const small=document.createElement('small');small.textContent='原文にある表現と登録用語の対応案';content.append(small);label.append(checkbox,content);aiOptions.append(label)});
+      if(!items.length){const message=document.createElement('p');message.className='empty';message.textContent='原文から安全に整理できる明確な検索用語はありませんでした。';aiOptions.append(message);return}
+      items.forEach((item,index)=>{const label=document.createElement('label');label.className='ai-option';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(index);const content=document.createElement('span');content.append(document.createTextNode(`${item.sourcePhrase} → ${item.canonicalTerm}`));const small=document.createElement('small');small.textContent='原文にある表現と標準用語の対応案';content.append(small);label.append(checkbox,content);aiOptions.append(label)});
     }
     document.querySelector('#normalizeAi').addEventListener('click',async()=>{
       const text=request.value.trim(), endpoint=aiEndpoint.value.trim();
@@ -6265,13 +6265,13 @@
       if(!endpoint){setScanStatus('先に「AI表記整理の接続設定」でWorker URLを保存してください。',true);document.querySelector('.ai-settings').open=true;aiEndpoint.focus();return}
       let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setScanStatus('Worker URLの形式を確認してください。',true);return}
       if(!confirm('依頼文のテキストをGoogle Gemini APIへ送信して言い換え案を作ります。無料枠では入力内容がGoogleのサービス改善に使われる場合があります。患者氏名・IDなどの個人情報や実際の患者情報を含めず、架空の文で試してください。続けますか？'))return;
-      const button=document.querySelector('#normalizeAi');button.disabled=true;setScanStatus('登録用語への言い換え案を作成しています…');aiReview.classList.add('hidden');
+      const button=document.querySelector('#normalizeAi');button.disabled=true;setScanStatus('検索用語案を作成しています…');aiReview.classList.add('hidden');
       try{
         const response=await fetch(parsed.href.replace(/\/$/,'')+'/normalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
         const payload=await response.json().catch(()=>({}));
         if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）`);
-        const inputNormalized=normalizedText(text),allowed=new Set(allowedCanonicalTerms);
-        aiSuggestions=(Array.isArray(payload.matches)?payload.matches:[]).filter(item=>item&&typeof item.sourcePhrase==='string'&&typeof item.canonicalTerm==='string'&&allowed.has(item.canonicalTerm)&&inputNormalized.includes(normalizedText(item.sourcePhrase)));
+        const inputNormalized=normalizedText(text);
+        aiSuggestions=(Array.isArray(payload.matches)?payload.matches:[]).filter(item=>item&&typeof item.sourcePhrase==='string'&&typeof item.canonicalTerm==='string'&&item.canonicalTerm.trim().length>0&&item.canonicalTerm.trim().length<=80&&inputNormalized.includes(normalizedText(item.sourcePhrase)));
         aiSuggestions=[...new Map(aiSuggestions.map(item=>[`${item.sourcePhrase}\u0000${item.canonicalTerm}`,item])).values()];
         renderAiSuggestions(aiSuggestions);aiReview.classList.remove('hidden');setScanStatus('AI案を原文と照合し、使う用語を選択してください。');
       }catch(error){setScanStatus(error.message||'AIの接続に失敗しました。Worker URLと設定を確認してください。',true)}
