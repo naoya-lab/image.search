@@ -66,7 +66,7 @@ test('answers preflight requests with the allowed origin', async () => {
 
 test('keeps the Worker allowlist synchronized with the UI trigger vocabulary', () => {
   const html = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-  const rulesText = html.match(/const rules = \[([\s\S]*?)\n    \];/);
+  const rulesText = html.match(/const rules = \[([\s\S]*?)\n\s*\];/);
   assert.ok(rulesText, 'could not find UI rules array');
   const rules = Function(`return [${rulesText[1]}]`)();
   const uiTerms = new Set(rules.flatMap((rule) => rule.terms));
