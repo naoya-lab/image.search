@@ -19,11 +19,11 @@
 <body>
   <main class="shell">
     <header class="top">
-      <div class="brand"><div class="logo">IA</div><div><div class="brand-name">Imaging Assist</div><div class="brand-sub">画像検査依頼サポート · prototype v0.2</div></div></div>
+      <div class="brand"><div class="logo">IA</div><div><div class="brand-name">Imaging Assist</div><div class="brand-sub">画像検査依頼サポート · guideline-linked prototype v0.3</div></div></div>
       <div class="local-badge">● OCR画像は端末内で処理</div>
     </header>
     <section class="hero">
-      <div><div class="eyebrow">Radiology workflow · concept</div><h1>依頼文から、検討ポイントを整理。</h1><p>検査依頼の文章を手がかりに、考えられる病態と撮影プロトコルの候補、確認事項を並べます。最終判断は依頼医・放射線科医と施設プロトコルで確認してください。</p></div>
+      <div><div class="eyebrow">Radiology workflow · concept</div><h1>依頼文から、検討ポイントを整理。</h1><p>全身の部位を選択できます。根拠を登録した候補にはガイドラインへのリンクを表示し、未登録の部位はガイドライン検索へ案内します。最終判断は依頼医・放射線科医と施設プロトコルで確認してください。</p></div>
       <aside class="hero-note"><b>試作版の注意</b><br>候補はキーワードによる参考表示です。診断、検査の適否、撮影条件を確定しません。患者氏名・IDなどの個人情報を入力しないでください。</aside>
     </section>
     <section class="workspace">
@@ -31,7 +31,7 @@
         <div class="card-title"><h2>依頼内容を入力</h2><span class="step">01 / INPUT</span></div>
         <div class="selectors">
           <div><label class="field-label" for="modality">モダリティ</label><select id="modality"><option value="auto">自動で候補を表示</option><option value="CT">CT</option><option value="MRI">MRI</option></select></div>
-          <div><label class="field-label" for="region">撮影部位 <span class="hint">任意</span></label><select id="region"><option value="">依頼文から推定</option><option>頭部</option><option>胸部</option><option>腹部・骨盤</option><option>脊椎</option><option>関節・骨</option></select></div>
+        <div><label class="field-label" for="region">撮影部位 <span class="hint">任意</span></label><select id="region"><option value="">依頼文から推定</option><option value="全身">全身・部位未指定</option><option>頭部</option><option>頭頸部</option><option>胸部</option><option>心臓・大血管</option><option>腹部・骨盤</option><option>骨盤・婦人科</option><option>泌尿器</option><option>脊椎</option><option>関節・骨</option><option>乳房</option><option>小児（全身）</option></select></div>
         </div>
         <div class="scan-actions"><button class="primary" id="startCamera" type="button">📷 カメラで依頼文を読み取る</button><button class="secondary" id="chooseImage" type="button">写真を選んで読み取る</button><input id="imageFile" type="file" accept="image/*" capture="environment" hidden></div>
         <label class="field-label" for="request">依頼文 <span class="hint">手入力または上のボタンから読み取り · 入力すると候補を自動更新</span></label>
@@ -49,17 +49,25 @@
         <div class="results hidden" id="results"></div>
       </article>
     </section>
-    <footer class="footer"><span>Imaging Assist · ローカル試作 v0.1</span><span>施設ごとのプロトコル登録・根拠情報の確認が必要です。実運用前に臨床安全性と個人情報保護を検証してください。</span></footer>
+    <footer class="footer"><span>Imaging Assist · ガイドライン参照試作 v0.3</span><span>施設ごとのプロトコル登録・根拠情報の確認が必要です。実運用前に臨床安全性と個人情報保護を検証してください。</span></footer>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script>
   <script>
     // Prototype keyword matching only: this is not a diagnostic or protocol decision engine.
     const rules = [
-      {region:'頭部', terms:['脳梗塞','脳卒中','構音障害','片麻痺','神経症状','意識障害','発症'], conditions:[['急性脳梗塞','突然発症の局所神経症状などがある場合に検討される候補です。'],['頭蓋内出血','急性発症では出血性病変の除外も確認対象です。']], protocols:[['頭部単純CT','急性出血の評価候補。施設の脳卒中初期画像フローを確認。','CT'],['頭部MRI（DWIを含む）','急性虚血性病変の評価候補。撮像可否・緊急フローは施設手順に従う。','MRI']], checks:['最終健常確認時刻・症状出現時刻','神経症状と発症様式','施設の脳卒中画像フロー・緊急連絡手順']},
-      {region:'頭部', terms:['頭部打撲','転倒','頭部外傷','頭痛','頭蓋内出血'], conditions:[['外傷性頭蓋内出血','受傷機転や症状、抗凝固薬の有無と合わせて検討します。'],['頭蓋骨骨折','外傷機転・局所所見がある場合の評価候補です。']], protocols:[['頭部単純CT','急性外傷の初期評価候補。追加範囲は施設基準で確認。','CT']], checks:['受傷時刻・機転・意識消失','抗凝固薬・抗血小板薬の使用','頸椎撮影の必要性と施設基準']},
-      {region:'脊椎', terms:['腰痛','下肢痛','坐骨神経','椎間板','ヘルニア','脊柱管狭窄','しびれ'], conditions:[['椎間板ヘルニア','神経根症状の部位や神経学的所見との整合を確認します。'],['脊柱管狭窄','症状・診察所見と画像の対応を確認する候補です.']], protocols:[['腰椎MRI（矢状断・横断を含む）','椎間板・神経根・脊柱管の評価候補。撮像範囲は依頼目的で確認。','MRI']], checks:['症状の左右・高位・発症時期','筋力低下、膀胱直腸障害などの有無','MRI禁忌・体内金属・閉所対応']},
-      {region:'腹部・骨盤', terms:['腹痛','右季肋部','胆道','胆管','黄疸','発熱','胆嚢'], conditions:[['胆嚢炎・胆管炎','症状、炎症反応、肝胆道系検査値などと合わせて評価します。'],['胆石・胆道閉塞','超音波所見や臨床経過も確認する候補です。']], protocols:[['腹部超音波・造影CTなど','依頼目的・腎機能・妊娠可能性・施設の腹痛フローにより選択。','CT'],['MRCPを含む腹部MRI','胆道評価の候補。緊急度・禁忌・施設手順を確認。','MRI']], checks:['痛みの部位・持続時間・発熱','腎機能・造影剤歴・妊娠可能性','超音波など先行検査と検査値']},
-      {region:'胸部', terms:['胸痛','呼吸困難','肺塞栓','血痰','大動脈','解離'], conditions:[['急性冠症候群・大動脈疾患など','胸痛の鑑別は症状・心電図・採血・緊急度と合わせて医師が判断します。'],['肺血栓塞栓症','臨床確率や採血結果などを踏まえた評価候補です。']], protocols:[['造影CT（目的別プロトコル）','大動脈・肺動脈など疑う血管により撮影条件が異なります。施設手順を確認。','CT']], checks:['緊急度・バイタル・心電図・採血','疑う血管と依頼目的の一致','腎機能・造影剤歴・注入ルート']}
+      {region:'頭部', trigger:[['急性脳梗塞'],['脳梗塞疑い'],['脳卒中'],['構音障害'],['片麻痺'],['最終健常'],['急性','神経症状']], terms:['急性脳梗塞','脳梗塞疑い','脳卒中','構音障害','片麻痺','神経症状','最終健常'], conditions:[['急性脳梗塞','突然発症の局所神経症状などがある場合の検討候補。症状だけで確定できません。'],['頭蓋内出血','急性発症では出血性病変の評価も必要です。']], protocols:[['頭部単純CT','再灌流療法を検討する場合、出血除外に用いる初期画像候補。追加撮像で治療開始を遅らせないよう施設の脳卒中フローを確認。','CT'],['頭部MRI（DWI・MRAを優先、FLAIR・T2*/SWIなど）','MRIを選ぶ場合の候補シーケンス。患者状態と緊急度に応じて必要最小限にし、施設手順で確認。','MRI'],['CTAまたはMRA','主幹動脈閉塞の評価が必要な状況で検討する候補。全例に一律追加するものではありません。','CT/MRI']], checks:['最終健常確認時刻・症状出現時刻','神経所見・治療開始までの時間','施設の脳卒中初期画像・緊急連絡フロー'], sources:[{title:'急性期脳梗塞患者に対する再灌流療法の適応決定において勧められる画像検査は何か？',url:'https://jrs-gl.radiology.jp/articles/3186/',updated:'2026-09-18'},{title:'脳神経領域の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/3116/',updated:'2026-09-18'}], scope:'急性期・再灌流療法を検討する状況の参考です。年齢・症状・治療適応を判定する機能ではありません。'},
+      {region:'頭部', trigger:[['頭部打撲'],['頭部外傷'],['頭蓋内出血'],['頭蓋骨骨折'],['転倒','頭部']], terms:['頭部打撲','頭部外傷','頭蓋内出血','頭蓋骨骨折','転倒','頭部'], conditions:[['外傷性頭蓋内損傷','受傷機転、意識状態、神経所見、年齢などを含めて判断する検討候補です。']], protocols:[['頭部単純CT','急性期の頭蓋内出血・脳挫傷・骨折の評価候補。適応判断と撮像範囲は年齢・状態・施設基準で確認。','CT'],['頭部MRI（T1・T2・FLAIR・T2*/SWI・DWI）','微細出血や外傷性軸索損傷などを追加評価する状況で検討する候補。急性期CTの代用として一律に勧めるものではありません。','MRI']], checks:['年齢・受傷時刻・受傷機転・意識消失','神経所見・抗凝固薬などの背景','小児は専用の頭部外傷基準を確認'], sources:[{title:'脳神経領域の標準的撮像法（頭部外傷）',url:'https://jrs-gl.radiology.jp/articles/3116/',updated:'2026-09-18'}], scope:'「頭痛」や「転倒」だけでは該当させず、頭部外傷を示す語がある場合に限って候補を表示します。'},
+      {region:'脊椎', trigger:[['腰椎椎間板ヘルニア'],['椎間板ヘルニア'],['坐骨神経痛'],['神経根症']], terms:['腰椎椎間板ヘルニア','椎間板ヘルニア','坐骨神経痛','神経根症'], conditions:[['腰椎椎間板ヘルニア','症状の左右・高位と診察所見の整合を確認する候補です。腰痛だけから推定しません。']], protocols:[['腰椎単純MRI（T2矢状断・横断など）','椎間板ヘルニア評価の候補。実際の撮像範囲・シーケンスは依頼目的と施設手順で確認。','MRI']], checks:['症状の左右・高位・発症時期','神経学的所見との整合','MRI禁忌・体内金属・緊急性'], sources:[{title:'腰椎椎間板ヘルニアの診断においてMRIは勧められるか？',url:'https://jrs-gl.radiology.jp/articles/2961/',updated:'2026-09-18'}], scope:'このルールは椎間板ヘルニア・神経根症が依頼文に明示された場合の参考です。'},
+      {region:'腹部・骨盤', trigger:[['胆道'],['胆管'],['胆石'],['胆嚢'],['右季肋部']], terms:['胆道','胆管','胆石','胆嚢','右季肋部'], conditions:[['胆嚢・胆道疾患','超音波などの先行所見、症状、検査値と合わせた評価候補です。']], protocols:[['胆嚢・胆道CT','胆道疾患の精査候補。薄いスライスなど撮像条件は依頼目的と施設プロトコルで確認。','CT'],['腹部MRI（MRCPを含む）','胆管全体の評価やCTで診断が不確かな場合などに検討する候補。元画像も確認し、造影の要否は目的別に判断。','MRI']], checks:['超音波など先行検査・肝胆道系検査値','胆管全体の描出が必要か・検査目的','腎機能・造影剤歴・妊娠可能性'], sources:[{title:'胆嚢・胆道の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/3287/',updated:'2026-09-17'}], scope:'一般的な腹痛や発熱だけでは胆道ルールを適用しません。'},
+      {region:'胸部', trigger:[['肺血栓塞栓症'],['肺塞栓'],['肺動脈血栓']], terms:['肺血栓塞栓症','肺塞栓','肺動脈血栓'], conditions:[['肺血栓塞栓症','臨床所見や検査前確率を含めて依頼医が評価する候補です。キーワードのみで検査適応を決めません。']], protocols:[['胸部造影CT（肺動脈相）','肺動脈を評価する目的別プロトコルの候補。造影タイミング・範囲は依頼目的と施設手順で確認。','CT']], checks:['臨床所見・検査前確率・先行検査','撮影目的と造影タイミングの一致','腎機能・造影剤歴・注入ルート'], sources:[{title:'胸部領域の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/3251/',updated:'2026-09-18'}], scope:'胸痛・呼吸困難だけでは肺塞栓ルールを適用しません。'},
+      {region:'頭頸部', trigger:[['深頸部感染'],['深頸部膿瘍']], terms:['深頸部感染','深頸部膿瘍'], conditions:[['深頸部感染・膿瘍','診察所見や気道症状など臨床情報と合わせて評価する候補です。']], protocols:[['頸部造影CT','炎症の広がりや膿瘍の評価候補。頭蓋内合併症・骨髄炎が疑われる場合はMRI併用を検討。小児では被ばくを含め個別に選択。','CT']], checks:['気道狭窄など緊急所見','感染の広がり・膿瘍の有無','腎機能・造影剤歴・小児の被ばく配慮'], sources:[{title:'深頸部感染症において勧められる画像検査は何か？',url:'https://jrs-gl.radiology.jp/articles/2698/',updated:'2026-09-18'}], scope:'「頸部痛」「発熱」だけでは該当させず、深頸部感染の疑いが明示された場合に表示します。'},
+      {region:'胸部', trigger:[['市中肺炎'],['肺炎鑑別'],['非感染性肺疾患']], terms:['市中肺炎','肺炎鑑別','非感染性肺疾患'], conditions:[['肺炎と非感染性肺疾患の鑑別','CTは追加情報となる場合がありますが、エビデンスには限界があり、臨床・検査情報と合わせて判断します。']], protocols:[['胸部CT（必要に応じHRCT）','胸部X線等で評価が難しく、CT所見が診療判断に役立つ場合に検討する候補。撮像法・追加相は目的別に施設手順で確認。','CT']], checks:['胸部X線など先行画像','免疫状態・症状経過・検査所見','撮像による追加情報が診療判断を変えるか'], sources:[{title:'成人市中肺炎と非感染性疾患の鑑別にCTは勧められるか？',url:'https://jrs-gl.radiology.jp/articles/3220/',updated:'2026-09-18'}], scope:'肺炎の語だけで全例にCTを勧めるルールではありません。'},
+      {region:'心臓・大血管', trigger:[['冠動脈CTA'],['冠動脈CT'],['冠動脈狭窄']], terms:['冠動脈CTA','冠動脈CT','冠動脈狭窄'], conditions:[['冠動脈疾患の解剖学的評価','患者選択や検査適応は症状・検査前確率・既往などを踏まえて判断する候補です。']], protocols:[['冠動脈CT angiography','心電図同期撮影などを用いる検査候補。心拍・息止め・造影条件は装置と患者に応じた施設プロトコルで確認。','CT']], checks:['臨床的な検査適応・検査前確率','心拍・リズム・息止め可否','腎機能・造影剤歴・静脈路'], sources:[{title:'心血管領域の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/3023/',updated:'2026-09-18'}], scope:'胸痛という語だけから冠動脈CTの適応を推定しません。'},
+      {region:'骨盤・婦人科', trigger:[['子宮頸癌'],['子宮頸がん'],['頸癌']], terms:['子宮頸癌','子宮頸がん','頸癌'], conditions:[['子宮頸癌の局所進展評価','病期診断や治療方針に必要な評価候補です。']], protocols:[['骨盤MRI','局所深達度評価の候補。撮像範囲・シーケンス・造影の要否は目的と施設手順で確認。','MRI']], checks:['臨床病期・治療計画','超音波・病理など先行情報','MRI禁忌・体内金属'], sources:[{title:'子宮頸癌の局所深達度診断にMRIは勧められるか？',url:'https://jrs-gl.radiology.jp/articles/2990/',updated:'2026-09-18'}], scope:'婦人科症状一般ではなく、子宮頸癌の局所評価が目的の場合の参考です。'},
+      {region:'泌尿器', trigger:[['上部尿路腫瘍'],['尿路上皮腫瘍'],['CT urography']], terms:['上部尿路腫瘍','尿路上皮腫瘍','CT urography'], conditions:[['上部尿路上皮腫瘍','年齢・血尿の性状・既往などリスク情報を含めて検討する候補です。']], protocols:[['CT urography（排泄相を含む）','上部尿路腫瘍が疑われる高リスク状況で検討する候補。撮像相・線量・腎機能への配慮は施設手順で確認。','CT']], checks:['血尿の性状・年齢・尿路上皮腫瘍の既往','腎機能・造影剤歴','尿路結石など他の検査目的との区別'], sources:[{title:'上部尿路上皮腫瘍を疑う場合行うべき画像検査は何か？',url:'https://jrs-gl.radiology.jp/articles/2870/',updated:'2026-09-18'},{title:'腎・上部尿路の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/2869/',updated:'2026-09-18'}], scope:'「血尿」だけでは一律にCT urographyを勧めず、リスクと検査目的を確認します。'},
+      {region:'関節・骨', trigger:[['骨軟部腫瘍'],['軟部腫瘍'],['骨腫瘍']], terms:['骨軟部腫瘍','軟部腫瘍','骨腫瘍'], conditions:[['骨・軟部腫瘍性病変','病変の部位・性状・広がりを評価する候補です。']], protocols:[['病変部MRI（必要に応じ拡散強調像）','腫瘍性病変の局所評価候補。造影・撮像範囲・シーケンスは病変と依頼目的に合わせて施設で決定。拡散強調像は補助情報です。','MRI']], checks:['病変の部位・範囲・先行画像','病理・整形外科等との検査目的の共有','MRI禁忌・造影剤の要否'], sources:[{title:'骨軟部腫瘍・腫瘍類似病変の標準的撮像法',url:'https://jrs-gl.radiology.jp/articles/2972/',updated:'2026-09-18'},{title:'骨軟部領域の腫瘍性病変に拡散強調像は推奨されるか？',url:'https://jrs-gl.radiology.jp/articles/3101/',updated:'2026-09-18'}], scope:'一般的な骨痛・関節痛だけでは腫瘍ルールを適用しません。'},
+      {region:'乳房', trigger:[['乳癌術前'],['乳腺病変'],['造影乳房MRI']], terms:['乳癌術前','乳腺病変','造影乳房MRI'], conditions:[['乳腺病変の追加評価','乳房超音波・マンモグラフィなどで診断困難な所見や、術前評価など特定の臨床状況で検討する候補です。']], protocols:[['造影乳房MRI','適応となる臨床状況を確認して検討。造影禁忌や腎機能などを確認し、全例に行うものではありません。','MRI']], checks:['マンモグラフィ・超音波など先行検査','MRIを追加する具体的な臨床疑問','造影剤歴・腎機能・MRI禁忌'], sources:[{title:'乳腺病変の精密検査において、造影乳房MRIが勧められる臨床的状況は何か？',url:'https://jrs-gl.radiology.jp/articles/2900/',updated:'2026-09-18'}], scope:'乳腺病変全般への一律のMRI推奨ではなく、適応状況を確認するための候補です。'},
+      {region:'小児（全身）', trigger:[['有熱時けいれん'],['熱性けいれん']], terms:['有熱時けいれん','熱性けいれん'], conditions:[], protocols:[], checks:['発達歴・発作型・発作後の神経所見','遷延する麻痺・焦点発作・遅延性発作などの有無','MRIを行う場合は鎮静の必要性とリスク'], sources:[{title:'有熱時けいれん発作に頭部画像検査は必要か？',url:'https://jrs-gl.radiology.jp/articles/2672/',updated:'2026-09-18'}], scope:'小児の有熱時けいれんでは、ルーチンの頭部CT/MRIを候補として出しません。特定の所見がある場合の検討は小児科・放射線科医が行います。'}
     ];
     const request = document.querySelector('#request'), modality = document.querySelector('#modality'), region = document.querySelector('#region');
     const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo'), ocrReview=document.querySelector('#ocrReview'), ocrText=document.querySelector('#ocrText');
@@ -122,18 +130,25 @@
     function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function analyze(){
       const text=request.value.trim(); if(!text){request.focus();request.setCustomValidity('依頼文を入力してください');request.reportValidity();request.setCustomValidity('');return}
-      const hits=rules.filter(r=>(!region.value||region.value===r.region)&&r.terms.some(t=>text.toLowerCase().includes(t.toLowerCase())));
-      const terms=[...new Set(hits.flatMap(r=>r.terms.filter(t=>text.toLowerCase().includes(t.toLowerCase()))))];
+      const normalized=text.normalize('NFKC').toLowerCase();
+      const hits=rules.filter(r=>(!region.value||region.value==='全身'||region.value===r.region)&&r.trigger.some(group=>group.every(t=>normalized.includes(t.normalize('NFKC').toLowerCase()))));
+      const terms=[...new Set(hits.flatMap(r=>r.terms.filter(t=>normalized.includes(t.normalize('NFKC').toLowerCase()))))];
       let conditions=[], protocols=[], checks=[];
       hits.forEach(r=>{conditions.push(...r.conditions);protocols.push(...r.protocols);checks.push(...r.checks)});
       const chosen=modality.value;
-      if(chosen!=='auto') protocols=protocols.filter(p=>p[2]===chosen);
+      if(chosen!=='auto') protocols=protocols.filter(p=>p[2]===chosen||p[2]==='CT/MRI');
       conditions=[...new Map(conditions.map(x=>[x[0],x])).values()];protocols=[...new Map(protocols.map(x=>[x[0],x])).values()];checks=[...new Set(checks)];
+      const sources=[...new Map(hits.flatMap(r=>r.sources||[]).map(s=>[s.url,s])).values()];
+      const scopeNotes=[...new Set(hits.map(r=>r.scope).filter(Boolean))];
+      const searchTerm=region.value&&region.value!=='全身'?region.value:'画像検査';
+      const guidelineSearch=`https://jrs-gl.radiology.jp/articles/?keyword=${encodeURIComponent(searchTerm)}`;
       const known=hits.length>0;
-      const html=`<div class="result-meta">${known?`キーワード一致：${terms.map(escapeHtml).join('、')}`:'登録ルールとの一致なし'} · この一致は確率や診断を意味しません</div>
+      const html=`<div class="result-meta">${known?`キーワード一致：${terms.map(escapeHtml).join('、')}`:'登録済みルールとの一致なし'} · この一致は確率や診断を意味しません</div>
+        ${scopeNotes.length?`<div class="empty">${scopeNotes.map(escapeHtml).join('<br>')}</div>`:''}
         <div class="section"><h3>考えられる病態の候補</h3>${conditions.length?conditions.map(x=>`<div class="match"><div class="match-top"><span class="match-title">${escapeHtml(x[0])}</span><span class="tag">検討候補</span></div><p>${escapeHtml(x[1])}</p></div>`).join(''):'<div class="empty">候補を自動表示できません。依頼医へ目的・症状を確認してください。</div>'}</div>
         <div class="section"><h3>撮影プロトコルの候補</h3>${protocols.length?protocols.map(x=>`<div class="match protocol"><div class="match-top"><span class="match-title">${escapeHtml(x[0])}</span><span class="tag">${escapeHtml(x[2])} · 要照合</span></div><p>${escapeHtml(x[1])}</p></div>`).join(''):'<div class="empty">この試作の登録範囲に候補がありません。検査種・部位・目的を依頼医に確認してください。</div>'}</div>
         <div class="section"><h3>実施前に確認</h3><ul class="checklist">${(checks.length?checks:['依頼目的と撮影部位・範囲','施設内の承認済みプロトコル','必要な禁忌・造影関連情報']).map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></div>
+        <div class="section"><h3>根拠・参考資料（日本医学放射線学会 画像診断ガイドライン）</h3>${sources.length?sources.map(s=>`<div class="match"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a><p>最終確認日：${escapeHtml(s.updated)} · 詳細・適用条件は原文を確認</p></div>`).join(''):'<div class="empty">この部位のルールはまだ登録していません。</div>'}<p><a href="${guidelineSearch}" target="_blank" rel="noopener noreferrer">${escapeHtml(searchTerm)}に関するガイドラインを検索</a></p></div>
         <div class="warning"><b>参考表示です。</b>所見や依頼文だけで検査を確定しないでください。依頼医・放射線科医に確認し、施設内の承認済みプロトコルを優先してください。</div>`;
       document.querySelector('#results').innerHTML=html;document.querySelector('#results').classList.remove('hidden');document.querySelector('#placeholder').classList.add('hidden');
     }
