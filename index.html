@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f8">
+  <title>Imaging Assist — 画像検査依頼サポート</title>
+  <style>
+    :root{--ink:#172b3b;--muted:#667887;--line:#dce4e8;--paper:#fff;--canvas:#f4f7f8;--teal:#087f83;--teal-dark:#06656b;--mint:#e6f5f2;--amber:#a86412;--amber-bg:#fff5e7;--red:#a73b3b;--shadow:0 14px 40px #132b3910}
+    *{box-sizing:border-box}body{margin:0;background:var(--canvas);color:var(--ink);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;line-height:1.55}
+    button,textarea,select{font:inherit}button{cursor:pointer}.shell{max-width:1180px;margin:auto;padding:24px 30px 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:12px}.logo{width:40px;height:40px;border-radius:13px;background:#d9f0eb;color:var(--teal);display:grid;place-items:center;font-size:20px;font-weight:800}.brand-name{font-weight:760;letter-spacing:-.02em}.brand-sub{font-size:12px;color:var(--muted)}.local-badge{font-size:12px;color:#35665f;background:#e8f3ee;border:1px solid #cce5dc;border-radius:999px;padding:7px 11px;white-space:nowrap}
+    .hero{display:grid;grid-template-columns:1.25fr .75fr;gap:28px;align-items:end;margin-bottom:24px}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--teal);font-weight:800}.hero h1{font-size:clamp(27px,4vw,40px);line-height:1.2;letter-spacing:-.04em;margin:8px 0 10px}.hero p{max-width:670px;margin:0;color:var(--muted);font-size:14px}.hero-note{border-left:3px solid #e3ac5d;background:var(--amber-bg);padding:14px 16px;border-radius:0 12px 12px 0;font-size:12px;color:#79531e}
+    .workspace{display:grid;grid-template-columns:minmax(0,1.03fr) minmax(0,.97fr);gap:20px;align-items:start}.card{background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.input-card{padding:22px}.card-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.card-title h2{font-size:16px;margin:0}.step{font-size:11px;font-weight:750;color:var(--teal);background:var(--mint);padding:5px 9px;border-radius:999px}.field-label{font-size:12px;font-weight:730;display:block;margin:15px 0 7px}.hint{font-size:11px;color:var(--muted);font-weight:450}.selectors{display:grid;grid-template-columns:1fr 1fr;gap:12px}select{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px 12px;color:var(--ink);outline:none}select:focus,textarea:focus{border-color:#67aaa5;box-shadow:0 0 0 3px #0b89851a}textarea{width:100%;min-height:144px;resize:vertical;border:1px solid var(--line);border-radius:11px;padding:13px;color:var(--ink);outline:none;font-size:13px}textarea::placeholder{color:#9aa8b1}.scan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.scan-panel{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f7fafb}.scan-panel video{display:block;width:100%;max-height:300px;object-fit:contain;background:#15232c;border-radius:8px}.scan-panel .scan-actions{margin-top:10px}.scan-status{min-height:18px;margin:8px 0 0;font-size:11px;color:#59717e}.scan-status.error{color:var(--red)}.scan-note{font-size:10px;color:#71808a;margin:8px 0 0}.examples{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.chip{background:#fff;border:1px solid var(--line);color:#526676;border-radius:999px;padding:6px 10px;font-size:11px}.chip:hover{border-color:#71aaa5;color:var(--teal)}.actions{display:flex;align-items:center;gap:10px;margin-top:17px}.primary{border:0;border-radius:10px;background:var(--teal);color:white;font-weight:740;padding:11px 16px;box-shadow:0 5px 12px #087f8320}.primary:hover{background:var(--teal-dark)}.secondary{border:1px solid var(--line);background:white;color:#506371;border-radius:10px;padding:10px 13px;font-size:12px}.privacy{margin-left:auto;color:#71808a;font-size:10px}
+    .result-card{overflow:hidden;min-height:510px}.result-head{padding:20px 22px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.result-head h2{margin:0;font-size:16px}.placeholder{padding:48px 25px;text-align:center;color:var(--muted)}.placeholder-icon{width:54px;height:54px;margin:0 auto 15px;border-radius:18px;background:#eef3f4;display:grid;place-items:center;color:#78909c;font-size:24px}.placeholder strong{display:block;color:#435968;font-size:14px;margin-bottom:5px}.placeholder p{font-size:12px;max-width:290px;margin:auto}.results{padding:18px 22px 22px}.result-meta{font-size:11px;color:var(--muted);margin-bottom:15px}.section{margin-top:18px}.section h3{margin:0 0 9px;font-size:12px;color:#516879;letter-spacing:.02em}.match{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:8px 0}.match-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.match-title{font-weight:760;font-size:13px}.tag{font-size:10px;background:#edf4f6;color:#53707d;border-radius:999px;padding:4px 8px;white-space:nowrap}.match p{font-size:11px;color:var(--muted);margin:6px 0 0}.protocol{background:#f5faf9;border-color:#d4e8e3}.protocol .match-title{color:#146c6b}.checklist{padding:0;margin:0;list-style:none}.checklist li{font-size:11px;color:#536776;padding:7px 0;border-bottom:1px solid #edf1f2;display:flex;gap:8px}.checklist li:before{content:"□";font-size:14px;color:var(--teal);line-height:1}.warning{margin-top:16px;background:var(--amber-bg);border:1px solid #f3dfbf;border-radius:11px;padding:11px 12px;color:#77551f;font-size:11px}.footer{margin-top:22px;display:flex;justify-content:space-between;gap:16px;color:#84929a;font-size:10px}.hidden{display:none!important}.empty{padding:13px;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:11px}
+    @media(max-width:800px){.shell{padding:18px 15px 35px}.hero{grid-template-columns:1fr;gap:14px}.workspace{grid-template-columns:1fr}.result-card{min-height:360px}.footer{flex-direction:column}}
+    @media(max-width:460px){.top{align-items:flex-start}.brand-sub{font-size:10px}.local-badge{font-size:10px;padding:6px 8px}.input-card{padding:17px}.selectors{grid-template-columns:1fr}.privacy{display:none}.result-head{padding:17px}.results{padding:15px 17px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div class="brand"><div class="logo">IA</div><div><div class="brand-name">Imaging Assist</div><div class="brand-sub">画像検査依頼サポート · prototype v0.2</div></div></div>
+      <div class="local-badge">● OCR画像は端末内で処理</div>
+    </header>
+    <section class="hero">
+      <div><div class="eyebrow">Radiology workflow · concept</div><h1>依頼文から、検討ポイントを整理。</h1><p>検査依頼の文章を手がかりに、考えられる病態と撮影プロトコルの候補、確認事項を並べます。最終判断は依頼医・放射線科医と施設プロトコルで確認してください。</p></div>
+      <aside class="hero-note"><b>試作版の注意</b><br>候補はキーワードによる参考表示です。診断、検査の適否、撮影条件を確定しません。患者氏名・IDなどの個人情報を入力しないでください。</aside>
+    </section>
+    <section class="workspace">
+      <article class="card input-card">
+        <div class="card-title"><h2>依頼内容を入力</h2><span class="step">01 / INPUT</span></div>
+        <div class="selectors">
+          <div><label class="field-label" for="modality">モダリティ</label><select id="modality"><option value="auto">自動で候補を表示</option><option value="CT">CT</option><option value="MRI">MRI</option></select></div>
+          <div><label class="field-label" for="region">撮影部位 <span class="hint">任意</span></label><select id="region"><option value="">依頼文から推定</option><option>頭部</option><option>胸部</option><option>腹部・骨盤</option><option>脊椎</option><option>関節・骨</option></select></div>
+        </div>
+        <div class="scan-actions"><button class="primary" id="startCamera" type="button">📷 カメラで依頼文を読み取る</button><button class="secondary" id="chooseImage" type="button">写真を選んで読み取る</button><input id="imageFile" type="file" accept="image/*" capture="environment" hidden></div>
+        <label class="field-label" for="request">依頼文 <span class="hint">手入力または上のボタンから読み取り · 入力すると候補を自動更新</span></label>
+        <textarea id="request" placeholder="例：突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。"></textarea>
+        <section class="scan-panel hidden" id="cameraPanel" aria-label="依頼文をカメラで撮影"><video id="cameraVideo" autoplay playsinline muted></video><div class="scan-actions"><button class="primary" id="takePhoto" type="button">撮影して文字を読み取る</button><button class="secondary" id="stopCamera" type="button">カメラを閉じる</button></div></section>
+        <p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
+        <p class="scan-note">OCRはこの端末のブラウザ内で行い、画像を送信しません。初回はOCRエンジンと日本語データをCDNから読み込みます。読み取り間違いがあるため、結果を必ず原文と照合してください。</p>
+        <div class="examples"><button class="chip" data-example="突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。">急な神経症状</button><button class="chip" data-example="転倒後の頭痛。頭部打撲、頭蓋内出血の有無を確認。">頭部打撲</button><button class="chip" data-example="腰痛と右下肢痛。腰椎椎間板ヘルニア疑い。">腰痛・下肢痛</button><button class="chip" data-example="右季肋部痛と発熱。胆道系感染症疑い。">腹痛・発熱</button></div>
+        <div class="actions"><button class="primary" id="analyze">候補を整理する <span aria-hidden="true">→</span></button><button class="secondary" id="clear">クリア</button><span class="privacy">入力内容は保存・送信されません</span></div>
+      </article>
+      <article class="card result-card" aria-live="polite">
+        <div class="result-head"><h2>確認用サマリー</h2><span class="step">02 / REVIEW</span></div>
+        <div class="placeholder" id="placeholder"><div class="placeholder-icon">⌕</div><strong>依頼文を入力すると候補を表示します</strong><p>一致した語句と候補の理由を確認し、施設内で承認された手順と照合してください。</p></div>
+        <div class="results hidden" id="results"></div>
+      </article>
+    </section>
+    <footer class="footer"><span>Imaging Assist · ローカル試作 v0.1</span><span>施設ごとのプロトコル登録・根拠情報の確認が必要です。実運用前に臨床安全性と個人情報保護を検証してください。</span></footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js"></script>
+  <script>
+    // Prototype keyword matching only: this is not a diagnostic or protocol decision engine.
+    const rules = [
+      {region:'頭部', terms:['脳梗塞','脳卒中','構音障害','片麻痺','神経症状','意識障害','発症'], conditions:[['急性脳梗塞','突然発症の局所神経症状などがある場合に検討される候補です。'],['頭蓋内出血','急性発症では出血性病変の除外も確認対象です。']], protocols:[['頭部単純CT','急性出血の評価候補。施設の脳卒中初期画像フローを確認。','CT'],['頭部MRI（DWIを含む）','急性虚血性病変の評価候補。撮像可否・緊急フローは施設手順に従う。','MRI']], checks:['最終健常確認時刻・症状出現時刻','神経症状と発症様式','施設の脳卒中画像フロー・緊急連絡手順']},
+      {region:'頭部', terms:['頭部打撲','転倒','頭部外傷','頭痛','頭蓋内出血'], conditions:[['外傷性頭蓋内出血','受傷機転や症状、抗凝固薬の有無と合わせて検討します。'],['頭蓋骨骨折','外傷機転・局所所見がある場合の評価候補です。']], protocols:[['頭部単純CT','急性外傷の初期評価候補。追加範囲は施設基準で確認。','CT']], checks:['受傷時刻・機転・意識消失','抗凝固薬・抗血小板薬の使用','頸椎撮影の必要性と施設基準']},
+      {region:'脊椎', terms:['腰痛','下肢痛','坐骨神経','椎間板','ヘルニア','脊柱管狭窄','しびれ'], conditions:[['椎間板ヘルニア','神経根症状の部位や神経学的所見との整合を確認します。'],['脊柱管狭窄','症状・診察所見と画像の対応を確認する候補です.']], protocols:[['腰椎MRI（矢状断・横断を含む）','椎間板・神経根・脊柱管の評価候補。撮像範囲は依頼目的で確認。','MRI']], checks:['症状の左右・高位・発症時期','筋力低下、膀胱直腸障害などの有無','MRI禁忌・体内金属・閉所対応']},
+      {region:'腹部・骨盤', terms:['腹痛','右季肋部','胆道','胆管','黄疸','発熱','胆嚢'], conditions:[['胆嚢炎・胆管炎','症状、炎症反応、肝胆道系検査値などと合わせて評価します。'],['胆石・胆道閉塞','超音波所見や臨床経過も確認する候補です。']], protocols:[['腹部超音波・造影CTなど','依頼目的・腎機能・妊娠可能性・施設の腹痛フローにより選択。','CT'],['MRCPを含む腹部MRI','胆道評価の候補。緊急度・禁忌・施設手順を確認。','MRI']], checks:['痛みの部位・持続時間・発熱','腎機能・造影剤歴・妊娠可能性','超音波など先行検査と検査値']},
+      {region:'胸部', terms:['胸痛','呼吸困難','肺塞栓','血痰','大動脈','解離'], conditions:[['急性冠症候群・大動脈疾患など','胸痛の鑑別は症状・心電図・採血・緊急度と合わせて医師が判断します。'],['肺血栓塞栓症','臨床確率や採血結果などを踏まえた評価候補です。']], protocols:[['造影CT（目的別プロトコル）','大動脈・肺動脈など疑う血管により撮影条件が異なります。施設手順を確認。','CT']], checks:['緊急度・バイタル・心電図・採血','疑う血管と依頼目的の一致','腎機能・造影剤歴・注入ルート']}
+    ];
+    const request = document.querySelector('#request'), modality = document.querySelector('#modality'), region = document.querySelector('#region');
+    const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo');
+    let cameraStream=null, ocrWorker=null;
+    function setScanStatus(message,error=false){statusEl.textContent=message;statusEl.classList.toggle('error',error)}
+    function stopCamera(){if(cameraStream){cameraStream.getTracks().forEach(track=>track.stop());cameraStream=null}video.srcObject=null;cameraPanel.classList.add('hidden')}
+    async function startCamera(){
+      if(!navigator.mediaDevices?.getUserMedia){setScanStatus('このブラウザではカメラを使えません。画像ファイルから読み取るか、HTTPSで開いてください。',true);return}
+      try{stopCamera();cameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});video.srcObject=cameraStream;cameraPanel.classList.remove('hidden');setScanStatus('書類全体が明るく、まっすぐ映るようにしてください。')}
+      catch(error){setScanStatus(error.name==='NotAllowedError'?'カメラの使用が許可されませんでした。ブラウザの設定を確認してください。':'カメラを開始できませんでした。画像ファイルから読み取ってください。',true)}
+    }
+    async function getOcrWorker(){
+      if(ocrWorker)return ocrWorker;
+      if(!window.Tesseract)throw new Error('OCRエンジンを読み込めません。ネット接続後にページを再読み込みしてください。');
+      ocrWorker=await Tesseract.createWorker(['jpn','eng'],1,{logger:m=>{if(m.status==='recognizing text')setScanStatus(`文字を読み取り中… ${Math.round((m.progress||0)*100)}%`)}});
+      return ocrWorker;
+    }
+    async function recognizeImage(image){
+      setScanStatus('OCRエンジンを準備しています…');
+      try{const worker=await getOcrWorker();setScanStatus('依頼文を読み取っています…');const {data:{text}}=await worker.recognize(image);const recognized=text.trim();if(!recognized){setScanStatus('文字を読み取れませんでした。明るさ・ピントを確認して撮り直してください。',true);return}
+        request.value=request.value.trim()?`${request.value.trim()}\n${recognized}`:recognized;request.dispatchEvent(new Event('input',{bubbles:true}));request.focus();setScanStatus('読み取り完了。原文と照合・修正してください。候補は自動更新されます。');
+      }catch(error){setScanStatus(error.message||'文字を読み取れませんでした。画像を選び直してください。',true)}
+    }
+    document.querySelector('#startCamera').addEventListener('click',startCamera);
+    document.querySelector('#stopCamera').addEventListener('click',stopCamera);
+    document.querySelector('#takePhoto').addEventListener('click',()=>{if(!video.videoWidth){setScanStatus('カメラ映像の準備中です。少し待ってからもう一度押してください。',true);return}const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0);stopCamera();canvas.toBlob(blob=>{if(blob)recognizeImage(blob);else setScanStatus('撮影画像を作成できませんでした。',true)},'image/jpeg',.92)});
+    document.querySelector('#chooseImage').addEventListener('click',()=>document.querySelector('#imageFile').click());
+    document.querySelector('#imageFile').addEventListener('change',event=>{const file=event.target.files?.[0];if(file){if(!file.type.startsWith('image/'))setScanStatus('画像ファイルを選択してください。',true);else if(file.size>15*1024*1024)setScanStatus('画像は15 MB以下のものを選択してください。',true);else recognizeImage(file)}event.target.value=''});
+    document.querySelectorAll('[data-example]').forEach(b=>b.addEventListener('click',()=>{request.value=b.dataset.example;request.focus()}));
+    document.querySelector('#clear').addEventListener('click',()=>{stopCamera();request.value='';modality.value='auto';region.value='';setScanStatus('');document.querySelector('#results').classList.add('hidden');document.querySelector('#placeholder').classList.remove('hidden');request.focus()});
+    window.addEventListener('pagehide',()=>{stopCamera();if(ocrWorker){ocrWorker.terminate();ocrWorker=null}});
+    function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function analyze(){
+      const text=request.value.trim(); if(!text){request.focus();request.setCustomValidity('依頼文を入力してください');request.reportValidity();request.setCustomValidity('');return}
+      const hits=rules.filter(r=>(!region.value||region.value===r.region)&&r.terms.some(t=>text.toLowerCase().includes(t.toLowerCase())));
+      const terms=[...new Set(hits.flatMap(r=>r.terms.filter(t=>text.toLowerCase().includes(t.toLowerCase()))))];
+      let conditions=[], protocols=[], checks=[];
+      hits.forEach(r=>{conditions.push(...r.conditions);protocols.push(...r.protocols);checks.push(...r.checks)});
+      const chosen=modality.value;
+      if(chosen!=='auto') protocols=protocols.filter(p=>p[2]===chosen);
+      conditions=[...new Map(conditions.map(x=>[x[0],x])).values()];protocols=[...new Map(protocols.map(x=>[x[0],x])).values()];checks=[...new Set(checks)];
+      const known=hits.length>0;
+      const html=`<div class="result-meta">${known?`キーワード一致：${terms.map(escapeHtml).join('、')}`:'登録ルールとの一致なし'} · この一致は確率や診断を意味しません</div>
+        <div class="section"><h3>考えられる病態の候補</h3>${conditions.length?conditions.map(x=>`<div class="match"><div class="match-top"><span class="match-title">${escapeHtml(x[0])}</span><span class="tag">検討候補</span></div><p>${escapeHtml(x[1])}</p></div>`).join(''):'<div class="empty">候補を自動表示できません。依頼医へ目的・症状を確認してください。</div>'}</div>
+        <div class="section"><h3>撮影プロトコルの候補</h3>${protocols.length?protocols.map(x=>`<div class="match protocol"><div class="match-top"><span class="match-title">${escapeHtml(x[0])}</span><span class="tag">${escapeHtml(x[2])} · 要照合</span></div><p>${escapeHtml(x[1])}</p></div>`).join(''):'<div class="empty">この試作の登録範囲に候補がありません。検査種・部位・目的を依頼医に確認してください。</div>'}</div>
+        <div class="section"><h3>実施前に確認</h3><ul class="checklist">${(checks.length?checks:['依頼目的と撮影部位・範囲','施設内の承認済みプロトコル','必要な禁忌・造影関連情報']).map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></div>
+        <div class="warning"><b>参考表示です。</b>所見や依頼文だけで検査を確定しないでください。依頼医・放射線科医に確認し、施設内の承認済みプロトコルを優先してください。</div>`;
+      document.querySelector('#results').innerHTML=html;document.querySelector('#results').classList.remove('hidden');document.querySelector('#placeholder').classList.add('hidden');
+    }
+    document.querySelector('#analyze').addEventListener('click',analyze);
+    let analysisTimer=null;
+    request.addEventListener('input',()=>{
+      clearTimeout(analysisTimer);
+      if(!request.value.trim()){
+        document.querySelector('#results').classList.add('hidden');
+        document.querySelector('#placeholder').classList.remove('hidden');
+        return;
+      }
+      analysisTimer=setTimeout(analyze,350);
+    });
+  </script>
+</body>
+</html>
