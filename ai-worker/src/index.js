@@ -122,7 +122,7 @@ function validateMatches(value, sourceText) {
     if (!item || typeof item.sourcePhrase !== 'string' || typeof item.canonicalTerm !== 'string') return [];
     const sourcePhrase = item.sourcePhrase.trim().slice(0, 100);
     const canonicalTerm = item.canonicalTerm.trim();
-    if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\\r\\n\\u0000-\\u001f]/.test(canonicalTerm)) return [];
+    if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\r\n\u0000-\u001f]/.test(canonicalTerm)) return [];
     // Source wording must exist in the submitted text; the normalized term may be outside the fixed guideline vocabulary.
     if (!normalizedSource.includes(normalize(sourcePhrase))) return [];
     return [{ sourcePhrase, canonicalTerm }];
@@ -204,7 +204,7 @@ export default {
           systemInstruction: { parts: [{ text: instructions }] },
           contents: [{
             role: 'user',
-            parts: [{ text: `登録済み用語:\n${[...CANONICAL_TERMS].join('、')}\n\n依頼文:\n${text}` }],
+            parts: [{ text: `依頼文に書かれた症状・病名・検査目的を、診断や撮像法を新たに推測せず、同じ意味の一般的な医療用語に整理してください。固定リストに限定しません。sourcePhraseは原文の短い連続部分文字列、canonicalTermは対応する短い標準用語にします。\n\n依頼文:\n${text}` }],
           }],
           generationConfig: {
             temperature: 0,
