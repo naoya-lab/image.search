@@ -139,6 +139,64 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
     const url = new URL(request.url);
+    if (request.method === 'POST' && url.pathname === '/transcribe') {
+      if (!request.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
+        return json({ error: 'Content-Typeはapplication/jsonにしてください。' }, 415, origin);
+      }
+      const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const rate = await env.AI_RATE_LIMITER.limit({ key: clientIp });
+      if (!rate.success) return json({ error: '利用回数の上限に達しました。1分ほど待って再試行してください。' }, 429, origin);
+      let body;
+      try {
+        const raw = await request.text();
+        if (raw.length > 5_500_000) return json({ error: '画像が大きすぎます。写真を切り抜いてから再試行してください。' }, 413, origin);
+        body = JSON.parse(raw);
+      } catch {
+        return json({ error: 'JSON形式のリクエストを確認してください。' }, 400, origin);
+      }
+      const imageBase64 = typeof body.imageBase64 === 'string' ? body.imageBase64 : '';
+      const mimeType = body.mimeType;
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !imageBase64 || imageBase64.length > 4_100_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
+        return json({ error: '画像形式またはサイズを確認してください。JPEG・PNG・WebP画像を選び直してください。' }, 400, origin);
+      }
+      if (!env.GEMINI_API_KEY) return json({ error: 'WorkerにGEMINI_API_KEYが設定されていません。Cloudflare Secretを確認してください。' }, 503, origin);
+
+      let upstream;
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', {
+            method: 'POST',
+            headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: '画像内の依頼文を見たとおりに文字起こししてください。日本語の表記を勝手に修正・補完・要約・翻訳しないでください。改行と箇条書きは可能な範囲で保持してください。読めない箇所は[判読不能]と書いてください。診断、病名の推測、検査プロトコルの提案は行わず、依頼文以外の画面表示や個人識別情報は出力しないでください。' }] },
+              contents: [{ role: 'user', parts: [{ text: 'この画像の依頼文部分だけを、見える範囲で忠実に文字起こししてください。' }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: 2000 },
+            }),
+          });
+          if (![502, 503, 504].includes(upstream.status) || attempt === 2) break;
+          await new Promise((resolve) => setTimeout(resolve, 500 * (2 ** attempt) + Math.random() * 250));
+        }
+      } catch {
+        return json({ error: 'Gemini APIに接続できませんでした。時間をおいて再試行してください。' }, 502, origin);
+      }
+      if (!upstream.ok) {
+        const message = upstream.status === 429
+          ? 'Gemini APIの利用上限に達した可能性があります。AI Studioの利用量・請求設定を確認してください。'
+          : [502, 503, 504].includes(upstream.status)
+            ? `Gemini APIが一時的に利用できません（HTTP ${upstream.status}）。少し時間をおいて再試行してください。`
+            : [401, 403].includes(upstream.status)
+              ? `Gemini APIの認証または権限エラー（HTTP ${upstream.status}）です。Cloudflare Secretを確認してください。`
+              : `Gemini APIでエラーが発生しました（HTTP ${upstream.status}）。モデル・API設定を確認してください。`;
+        return json({ error: message }, 502, origin);
+      }
+      try {
+        const outputText = extractOutputText(await upstream.json()).trim();
+        if (!outputText) throw new Error('No transcription text');
+        return json({ text: outputText.slice(0, 8000) }, 200, origin);
+      } catch {
+        return json({ error: 'Geminiの文字起こし結果を読み取れませんでした。もう一度お試しください。' }, 502, origin);
+      }
+    }
     if (request.method !== 'POST' || url.pathname !== '/normalize') {
       return json({ error: 'このURLではPOST /normalizeのみ利用できます。' }, 404, origin);
     }
