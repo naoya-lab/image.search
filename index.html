@@ -37,6 +37,7 @@
         <label class="field-label" for="request">依頼文 <span class="hint">手入力または上のボタンから読み取り · 入力すると候補を自動更新</span></label>
         <textarea id="request" placeholder="例：突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。"></textarea>
         <section class="scan-panel hidden" id="cameraPanel" aria-label="依頼文をカメラで撮影"><video id="cameraVideo" autoplay playsinline muted></video><div class="scan-actions"><button class="primary" id="takePhoto" type="button">撮影して文字を読み取る</button><button class="secondary" id="stopCamera" type="button">カメラを閉じる</button></div></section>
+        <section class="scan-panel hidden" id="ocrReview" aria-label="OCR読み取り結果の確認"><label class="field-label" for="ocrText">読み取り結果を確認・修正</label><textarea id="ocrText" rows="6" aria-describedby="ocrConfidence"></textarea><p class="scan-note" id="ocrConfidence"></p><div class="scan-actions"><button class="primary" id="applyOcr" type="button">確認して依頼文に反映</button><button class="secondary" id="discardOcr" type="button">読み取り結果を破棄</button></div></section>
         <p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
         <p class="scan-note">OCRはこの端末のブラウザ内で行い、画像を送信しません。初回はOCRエンジンと日本語データをCDNから読み込みます。読み取り間違いがあるため、結果を必ず原文と照合してください。</p>
         <div class="examples"><button class="chip" data-example="突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。">急な神経症状</button><button class="chip" data-example="転倒後の頭痛。頭部打撲、頭蓋内出血の有無を確認。">頭部打撲</button><button class="chip" data-example="腰痛と右下肢痛。腰椎椎間板ヘルニア疑い。">腰痛・下肢痛</button><button class="chip" data-example="右季肋部痛と発熱。胆道系感染症疑い。">腹痛・発熱</button></div>
@@ -61,7 +62,7 @@
       {region:'胸部', terms:['胸痛','呼吸困難','肺塞栓','血痰','大動脈','解離'], conditions:[['急性冠症候群・大動脈疾患など','胸痛の鑑別は症状・心電図・採血・緊急度と合わせて医師が判断します。'],['肺血栓塞栓症','臨床確率や採血結果などを踏まえた評価候補です。']], protocols:[['造影CT（目的別プロトコル）','大動脈・肺動脈など疑う血管により撮影条件が異なります。施設手順を確認。','CT']], checks:['緊急度・バイタル・心電図・採血','疑う血管と依頼目的の一致','腎機能・造影剤歴・注入ルート']}
     ];
     const request = document.querySelector('#request'), modality = document.querySelector('#modality'), region = document.querySelector('#region');
-    const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo');
+    const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo'), ocrReview=document.querySelector('#ocrReview'), ocrText=document.querySelector('#ocrText');
     let cameraStream=null, ocrWorker=null;
     function setScanStatus(message,error=false){statusEl.textContent=message;statusEl.classList.toggle('error',error)}
     function stopCamera(){if(cameraStream){cameraStream.getTracks().forEach(track=>track.stop());cameraStream=null}video.srcObject=null;cameraPanel.classList.add('hidden')}
@@ -74,14 +75,42 @@
       if(ocrWorker)return ocrWorker;
       if(!window.Tesseract)throw new Error('OCRエンジンを読み込めません。ネット接続後にページを再読み込みしてください。');
       ocrWorker=await Tesseract.createWorker(['jpn','eng'],1,{logger:m=>{if(m.status==='recognizing text')setScanStatus(`文字を読み取り中… ${Math.round((m.progress||0)*100)}%`)}});
+      await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1',user_defined_dpi:'300'});
       return ocrWorker;
     }
+    function prepareOcrImage(image){
+      return new Promise((resolve,reject)=>{
+        const url=URL.createObjectURL(image),source=new Image();
+        source.onload=()=>{
+          URL.revokeObjectURL(url);
+          const scale=Math.min(2.2,2400/Math.max(source.naturalWidth,source.naturalHeight));
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.max(1,Math.round(source.naturalWidth*scale));
+          canvas.height=Math.max(1,Math.round(source.naturalHeight*scale));
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});
+          ctx.drawImage(source,0,0,canvas.width,canvas.height);
+          const frame=ctx.getImageData(0,0,canvas.width,canvas.height),pixels=frame.data;
+          for(let i=0;i<pixels.length;i+=4){
+            const gray=.299*pixels[i]+.587*pixels[i+1]+.114*pixels[i+2];
+            const enhanced=Math.max(0,Math.min(255,(gray-128)*1.35+128));
+            pixels[i]=pixels[i+1]=pixels[i+2]=enhanced;
+          }
+          ctx.putImageData(frame,0,0);resolve(canvas);
+        };
+        source.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('画像を開けませんでした。別の写真を選んでください。'))};
+        source.src=url;
+      });
+    }
     async function recognizeImage(image){
-      setScanStatus('OCRエンジンを準備しています…');
-      try{const worker=await getOcrWorker();setScanStatus('依頼文を読み取っています…');const {data:{text}}=await worker.recognize(image);const recognized=text.trim();if(!recognized){setScanStatus('文字を読み取れませんでした。明るさ・ピントを確認して撮り直してください。',true);return}
-        request.value=request.value.trim()?`${request.value.trim()}\n${recognized}`:recognized;request.dispatchEvent(new Event('input',{bubbles:true}));request.focus();setScanStatus('読み取り完了。原文と照合・修正してください。候補は自動更新されます。');
+      ocrReview.classList.add('hidden');
+      setScanStatus('画像を調整してOCRエンジンを準備しています…');
+      try{const worker=await getOcrWorker(),prepared=await prepareOcrImage(image);setScanStatus('依頼文を読み取っています…');const {data}=await worker.recognize(prepared);const recognized=(data.text||'').trim();if(!recognized){setScanStatus('文字を読み取れませんでした。書類全体にピントを合わせ、明るく撮り直してください。',true);return}
+        ocrText.value=recognized;document.querySelector('#ocrConfidence').textContent=`OCR参考スコア ${Math.round(data.confidence||0)} / 100（正確さの保証ではありません。必ず原文と照合してください）`;
+        ocrReview.classList.remove('hidden');setScanStatus('読み取り結果を確認し、誤りを修正してから「確認して依頼文に反映」を押してください。');ocrText.focus();
       }catch(error){setScanStatus(error.message||'文字を読み取れませんでした。画像を選び直してください。',true)}
     }
+    document.querySelector('#applyOcr').addEventListener('click',()=>{const recognized=ocrText.value.trim();if(!recognized){setScanStatus('読み取り結果が空です。',true);return}request.value=request.value.trim()?`${request.value.trim()}\n${recognized}`:recognized;request.dispatchEvent(new Event('input',{bubbles:true}));ocrReview.classList.add('hidden');request.focus();setScanStatus('確認済みの読み取り結果を反映しました。候補を確認してください。')});
+    document.querySelector('#discardOcr').addEventListener('click',()=>{ocrText.value='';ocrReview.classList.add('hidden');setScanStatus('読み取り結果を破棄しました。')});
     document.querySelector('#startCamera').addEventListener('click',startCamera);
     document.querySelector('#stopCamera').addEventListener('click',stopCamera);
     document.querySelector('#takePhoto').addEventListener('click',()=>{if(!video.videoWidth){setScanStatus('カメラ映像の準備中です。少し待ってからもう一度押してください。',true);return}const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0);stopCamera();canvas.toBlob(blob=>{if(blob)recognizeImage(blob);else setScanStatus('撮影画像を作成できませんでした。',true)},'image/jpeg',.92)});
