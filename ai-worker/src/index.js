@@ -218,9 +218,18 @@ export default {
       return json({ error: 'AIサービスに接続できませんでした。時間をおいて再試行してください。' }, 502, origin);
     }
     if (!upstream.ok) {
-      const message = upstream.status === 429
-        ? 'Gemini APIの利用上限に達した可能性があります。AI Studioの利用量を確認してください。'
-        : `Gemini APIがリクエストを拒否しました（HTTP ${upstream.status}）。APIキー、モデル、利用設定を確認してください。`;
+      let message;
+      if (upstream.status === 429) {
+        message = 'Gemini APIの利用上限に達した可能性があります。AI Studioの利用量とAPI利用設定を確認してください。';
+      } else if (upstream.status === 503 || upstream.status === 502 || upstream.status === 504) {
+        message = 'Gemini APIが一時的に利用できません（HTTP ' + upstream.status + '）。APIキーの問題とは限りません。少し時間をおいて再試行してください。';
+      } else if (upstream.status === 401 || upstream.status === 403) {
+        message = 'Gemini APIの認証または権限エラー（HTTP ' + upstream.status + '）です。Cloudflare SecretのGEMINI_API_KEY、Google AI Studioのキー状態、Gemini APIの有効化を確認してください。';
+      } else if (upstream.status === 400 || upstream.status === 404) {
+        message = 'Gemini APIのリクエストまたはモデル設定エラー（HTTP ' + upstream.status + '）です。Workerのモデル名とAPI設定を確認してください。';
+      } else {
+        message = 'Gemini APIでエラーが発生しました（HTTP ' + upstream.status + '）。時間をおいて再試行してください。';
+      }
       return json({ error: message }, 502, origin);
     }
 
