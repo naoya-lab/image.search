@@ -145,7 +145,7 @@
       if(!text){setScanStatus('先に依頼文を入力してください。',true);request.focus();return}
       if(!endpoint){setScanStatus('先に「AI表記整理の接続設定」でWorker URLを保存してください。',true);document.querySelector('.ai-settings').open=true;aiEndpoint.focus();return}
       let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setScanStatus('Worker URLの形式を確認してください。',true);return}
-      if(!confirm('依頼文のテキストを、設定した外部AIサービスへ送信して言い換え案を作ります。患者氏名・IDなどの個人情報が含まれていないことを確認してください。続けますか？'))return;
+      if(!confirm('依頼文のテキストをGoogle Gemini APIへ送信して言い換え案を作ります。無料枠では入力内容がGoogleのサービス改善に使われる場合があります。患者氏名・IDなどの個人情報や実際の患者情報を含めず、架空の文で試してください。続けますか？'))return;
       const button=document.querySelector('#normalizeAi');button.disabled=true;setScanStatus('登録用語への言い換え案を作成しています…');aiReview.classList.add('hidden');
       try{
         const response=await fetch(parsed.href.replace(/\/$/,'')+'/normalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
