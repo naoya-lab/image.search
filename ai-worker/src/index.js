@@ -193,8 +193,8 @@ export default {
     ].join('\n');
 
     let upstream;
-    try {
-      upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', {
+    const callGemini = async () => {
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', {
         method: 'POST',
         headers: {
           'x-goog-api-key': env.GEMINI_API_KEY,
@@ -214,6 +214,14 @@ export default {
           },
         }),
       });
+    };
+    try {
+      // Retry transient Gemini outages twice with short exponential backoff.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        upstream = await callGemini();
+        if (![502, 503, 504].includes(upstream.status) || attempt === 2) break;
+        await new Promise((resolve) => setTimeout(resolve, 500 * (2 ** attempt) + Math.random() * 250));
+      }
     } catch {
       return json({ error: 'AIサービスに接続できませんでした。時間をおいて再試行してください。' }, 502, origin);
     }
