@@ -122,8 +122,8 @@ function validateMatches(value, sourceText) {
     if (!item || typeof item.sourcePhrase !== 'string' || typeof item.canonicalTerm !== 'string') return [];
     const sourcePhrase = item.sourcePhrase.trim().slice(0, 100);
     const canonicalTerm = item.canonicalTerm.trim();
-    if (!sourcePhrase || !CANONICAL_TERMS.has(canonicalTerm)) return [];
-    // Only accept phrases literally present in the submitted text; never invent source wording.
+    if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\\r\\n\\u0000-\\u001f]/.test(canonicalTerm)) return [];
+    // Source wording must exist in the submitted text; the normalized term may be outside the fixed guideline vocabulary.
     if (!normalizedSource.includes(normalize(sourcePhrase))) return [];
     return [{ sourcePhrase, canonicalTerm }];
   });
@@ -171,7 +171,7 @@ export default {
             type: 'OBJECT',
             properties: {
               sourcePhrase: { type: 'STRING' },
-              canonicalTerm: { type: 'STRING', enum: [...CANONICAL_TERMS] },
+              canonicalTerm: { type: 'STRING' },
             },
             required: ['sourcePhrase', 'canonicalTerm'],
           },
@@ -181,7 +181,7 @@ export default {
     };
     const instructions = [
       'あなたは日本語の放射線検査依頼文に含まれる表記ゆれを正規化する補助器です。',
-      '役割は、依頼文に実際に書かれた語句を、提示された登録用語のうち同じ意味の語へ対応づけることだけです。',
+      '依頼文に明記された症状・病名・検査目的の表現を、一般的な医療用語へ整理します。固定の登録語リストにない用語も出力できます。',
       '症状から病態・診断を推測してはいけません。症状を病名へ、病名を症状へ変換してはいけません。',
       '否定、除外、既往、家族歴、可能性の低い鑑別など、文脈が曖昧な語は対応づけず除外してください。',
       'sourcePhraseは入力本文にそのまま含まれる短い部分文字列にしてください。OCR誤りを補完したり、本文にない表現を作らないでください。',
@@ -189,7 +189,7 @@ export default {
       '症状の言い換えは同じ症状の登録語へ対応づけます。症状から病名・原因・撮像の要否へ言い換えることは禁止です。',
       '典型例:「頭がズキズキする」→「頭痛」、「胸が締め付けられる」→「胸痛」、「お腹が痛い」→「腹痛」、「息が苦しい」→「呼吸困難」、「SpO2が下がっている」→「SpO2低下」、「腰が痛い」→「腰痛」、「脚がしびれる」→「下肢のしびれ」、「首が痛い」→「頸部痛」、「熱が続く」→「発熱」。',
       '候補用語は同じ意味が本文から明確な場合だけ選び、複数候補なら本文が直接支える最も具体的な用語だけを選びます。否定・疑い・既往の区別を保持します。',
-      '候補用語は許可リスト内からのみ選んでください。診断、検査適応、プロトコル、緊急度は出力しません。',
+      '症状から病名・原因を推測せず、依頼文に明記された内容の範囲を保ってください。検査適応、撮像プロトコル、緊急度は出力しません。canonicalTermは短い一般的な医療用語（80文字以内）にしてください。',
     ].join('\n');
 
     let upstream;
