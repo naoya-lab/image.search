@@ -1,0 +1,13 @@
+name = "imaging-assist-normalizer"
+main = "src/index.js"
+compatibility_date = "2026-10-14"
+workers_dev = true
+
+[observability]
+enabled = false
+
+[[ratelimits]]
+name = "AI_RATE_LIMITER"
+namespace_id = "8347291"
+simple = { limit = 10, period = 60 }
+
