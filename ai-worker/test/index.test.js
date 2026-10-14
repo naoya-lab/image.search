@@ -64,7 +64,7 @@ test('answers preflight requests with the allowed origin', async () => {
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://naoya-lab.github.io');
 });
 
-test('keeps the Worker allowlist synchronized with the UI trigger vocabulary', () => {
+test('keeps the Worker allowlist synchronized with registered UI terms', () => {
   const html = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const rulesText = html.match(/const rules = \[([\s\S]*?)\n\s*\];/);
   assert.ok(rulesText, 'could not find UI rules array');
