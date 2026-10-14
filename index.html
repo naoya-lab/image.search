@@ -51,7 +51,7 @@
         <label class="field-label" for="request">依頼文 <span class="hint">手入力または上のボタンから読み取り · 入力すると候補を自動更新</span></label>
         <textarea id="request" placeholder="例：突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。"></textarea>
         <section class="scan-panel hidden" id="cameraPanel" aria-label="依頼文をカメラで撮影"><video id="cameraVideo" autoplay playsinline muted></video><div class="scan-actions"><button class="primary" id="takePhoto" type="button">撮影して文字を読み取る</button><button class="secondary" id="stopCamera" type="button">カメラを閉じる</button></div></section>
-        <section class="scan-panel hidden" id="ocrReview" aria-label="OCR読み取り結果の確認"><label class="field-label" for="ocrText">読み取り結果を確認・修正</label><textarea id="ocrText" rows="6" aria-describedby="ocrConfidence"></textarea><p class="scan-note" id="ocrConfidence"></p><div class="scan-actions"><button class="secondary hidden" id="toggleOcrAlternative" type="button">別の読み取り結果を見る</button><button class="primary" id="applyOcr" type="button">確認して依頼文に反映</button><button class="secondary" id="discardOcr" type="button">読み取り結果を破棄</button></div></section>
+        <section class="scan-panel hidden" id="ocrReview" aria-label="OCR読み取り結果の確認"><label class="field-label" for="ocrText">読み取り結果を確認・修正</label><textarea id="ocrText" rows="6" aria-describedby="ocrConfidence"></textarea><p class="scan-note" id="ocrConfidence"></p><div class="scan-actions"><button class="secondary hidden" id="toggleOcrAlternative" type="button">別の読み取り結果を見る</button><button class="secondary" id="geminiTranscribe" type="button">Geminiでもう一度文字起こし</button><button class="primary" id="applyOcr" type="button">確認して依頼文に反映</button><button class="secondary" id="discardOcr" type="button">読み取り結果を破棄</button></div><p class="scan-note">Geminiを使うと、画像がCloudflare Worker経由でGoogleへ送信されます。実患者の依頼書は送らず、架空・匿名化した画像で試してください。施設の承認がある場合のみ利用してください。結果は必ず原文と照合してください。</p></section>
         <p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
         <p class="scan-note">OCRはこの端末のブラウザ内で行い、画像を送信しません。初回はOCRエンジンと日本語データをCDNから読み込みます。書類を画面いっぱいに、正面から、影や反射を避けて撮影してください。小さい文字は写真アプリで依頼文部分を切り抜いてから選ぶと読み取りやすくなります。読み取り間違いがあるため、結果を必ず原文と照合してください。</p>
         <details class="ai-settings"><summary>AI表記整理の接続設定</summary><label for="aiEndpoint">AI WorkerのベースURL</label><input id="aiEndpoint" type="url" inputmode="url" placeholder="https://your-worker.example.workers.dev" autocomplete="url"><span class="hint">Workerを設定後、ベースURLを保存してください。APIキーはここにもブラウザにも入力しません。</span><div class="scan-actions"><button class="secondary" id="saveAiEndpoint" type="button">URLを保存</button><span class="scan-note" id="aiConfigStatus" role="status"></span></div></details>
@@ -6187,7 +6187,7 @@
     const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo'), ocrReview=document.querySelector('#ocrReview'), ocrText=document.querySelector('#ocrText');
     const aiEndpoint=document.querySelector('#aiEndpoint'), aiOptions=document.querySelector('#aiOptions'), aiReview=document.querySelector('#aiReview');
     const AI_ENDPOINT_KEY='imaging-assist-ai-endpoint-v1';
-    let cameraStream=null, ocrWorker=null, aiSuggestions=[], acceptedAiTerms=[], primaryOcrText='', alternateOcrText='', primaryOcrConfidence=0, alternateOcrConfidence=0, showingAlternateOcr=false;
+    let cameraStream=null, ocrWorker=null, lastOcrImage=null, aiSuggestions=[], acceptedAiTerms=[], primaryOcrText='', alternateOcrText='', primaryOcrConfidence=0, alternateOcrConfidence=0, showingAlternateOcr=false;
     try{aiEndpoint.value=localStorage.getItem(AI_ENDPOINT_KEY)||''}catch{}
     const allowedCanonicalTerms=[...new Set(rules.flatMap(rule=>rule.trigger.flat()))];
     const keywordRows={"あ行":["アダムキービッツ動脈","アダムキエビッツ動脈","Adamkiewicz動脈","大前根髄質動脈","頭が痛い","頭の痛み","右季肋部","息切れ","頭がズキズキする","頭がガンガンする","頭が重い","頭が痛む","頭が割れるように痛い","頭痛あり","息苦しい","息が苦しい","息がしづらい","お腹が痛い","おなかが痛い","悪心","嘔気","嘔吐","意識障害","意識レベル低下","意識混濁","意識がもうろうとする","足の痛み","脚の痛み","足がしびれる","脚がしびれる","足のしびれ","脚のしびれ","足に痛みがある","脚に痛みがある"],"か行":["急性脳梗塞","急性","急性期脳内出血","急性胆管炎","急性胆管炎疑い","急性膵炎","構音障害","冠動脈CTA","冠動脈CT","冠動脈狭窄","くも膜下出血","くも膜下出血疑い","肝腫瘍","肝細胞癌","肝癌","肝腫瘤","骨軟部腫瘍","骨腫瘍","頸癌","頸椎症性脊髄症","頚椎症性脊髄症","頸髄症","頚髄症","呼吸困難","呼吸状態悪化","後頭部痛","こめかみの痛み","後頭部が痛い","胸痛","胸部痛","胸部圧迫感","下腹部痛","高熱","原因不明の発熱","呼吸が苦しい","呼吸苦","頸部痛","頚部痛","首の痛み","首が痛い","肩痛","肩の痛み","肩が痛い","関節痛","股関節痛","股関節の痛み","関節腫脹","急な頭痛"],"さ行":["最終健常","神経症状","神経根症","坐骨神経痛","深頸部感染","深頸部膿瘍","市中肺炎","造影乳房MRI","膵炎","膵炎重症度判定","膵癌","膵がん","膵腫瘍","膵癌疑い","腎腫瘍","腎癌","腎細胞癌","腎腫瘤","腎結石","腎疝痛","前立腺癌","前立腺がん","前立腺腫瘍","前立腺MRI","子宮頸癌","子宮頸がん","上部尿路腫瘍","酸素化不良","酸素化低下","酸素飽和度低下","酸素需要増加","酸素投与量増加","側頭部痛","前頭部痛","酸素化が悪い","酸素が足りない","酸素が低い","酸素飽和度低値","酸素必要量増加","失神","四肢しびれ","心窩部痛","前頭部が痛い","四肢痛","酸素投与量が増えた"],"た行":["頭部打撲","頭部外傷","頭蓋骨骨折","頭部","頭蓋内出血","転倒","胆道","胆管","胆石","胆嚢","胆管炎","頭痛","頭痛精査","頭痛増悪","頭重感","頭部痛","転移性脳腫瘍","低酸素血症","低酸素","頭痛が続く","頭頂部痛","頭頂部が痛い","頭部の痛み","突然の頭痛","脱力","力が入らない","手足のしびれ"],"な行":["脳梗塞疑い","脳卒中","脳内出血","脳出血","脳実質内出血","脳転移","脳転移疑い","尿路上皮腫瘍","尿路結石","尿路結石疑い","尿管結石","乳癌術前","乳腺病変","軟部腫瘍","熱性けいれん","熱がある","熱が続く"],"は行":["肺血栓塞栓症","肺塞栓","肺動脈血栓","肺炎鑑別","非感染性肺疾患","破裂脳動脈瘤","片麻痺","片頭痛","緊張型頭痛","腹痛","腹部痛","腹部の痛み","腹部不快感","腹部膨満感","腹部膨満","微熱","ふらつき","発熱","背部痛","背中が痛い","背中の痛み","吐き気","膝痛","膝の痛み","左下腹部痛"],"ま行":["みぞおちの痛み","めまい","胸が痛い","胸の痛み","胸が締め付けられる","胸が苦しい","胸苦しさ","右下腹部痛"],"や行":["有熱時けいれん","腰椎椎間板ヘルニア","椎間板ヘルニア","腰痛","腰部痛","下肢痛","下肢放散痛","腰坐骨神経痛","下肢しびれ","下肢のしびれ","腰から足にかけての痛み","腰が痛い","腰が痛む","腰の痛み","腰背部痛","腰から脚に放散する痛み"],"ら行":["雷鳴頭痛"],"わ行":[],"英数字":["Adamkiewicz artery","Adamkiewicz","CT urography","SAH","HCC","SpO2低下","SpO2低値","SpO2が低い"]};
@@ -6261,6 +6261,7 @@
       });
     }
     async function recognizeImage(image){
+      lastOcrImage=image;
       ocrReview.classList.add('hidden');
       document.querySelector('#toggleOcrAlternative').classList.add('hidden');
       setScanStatus('画像を調整してOCRエンジンを準備しています…');
@@ -6294,8 +6295,24 @@
       const confidence=showingAlternateOcr?alternateOcrConfidence:primaryOcrConfidence;
       document.querySelector('#ocrConfidence').textContent=`別の読み取り候補：参考スコア ${Math.round(confidence)} / 100（原文との照合が必要です）`;
     });
-    document.querySelector('#applyOcr').addEventListener('click',()=>{const recognized=ocrText.value.trim();if(!recognized){setScanStatus('読み取り結果が空です。',true);return}request.value=request.value.trim()?`${request.value.trim()}\n${recognized}`:recognized;request.dispatchEvent(new Event('input',{bubbles:true}));ocrReview.classList.add('hidden');request.focus();setScanStatus('確認済みの読み取り結果を反映しました。候補を確認してください。')});
-    document.querySelector('#discardOcr').addEventListener('click',()=>{ocrText.value='';ocrReview.classList.add('hidden');setScanStatus('読み取り結果を破棄しました。')});
+    function compressImageForGemini(image){
+      return new Promise((resolve,reject)=>{
+        const url=URL.createObjectURL(image),source=new Image();
+        source.onload=()=>{URL.revokeObjectURL(url);const scale=Math.min(1,2200/Math.max(source.naturalWidth,source.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(source.naturalWidth*scale));canvas.height=Math.max(1,Math.round(source.naturalHeight*scale));canvas.getContext('2d').drawImage(source,0,0,canvas.width,canvas.height);let dataUrl=canvas.toDataURL('image/jpeg',.88);if(dataUrl.length>4_000_000)dataUrl=canvas.toDataURL('image/jpeg',.72);if(dataUrl.length>4_000_000){reject(new Error('画像を十分に圧縮できませんでした。写真を切り抜いてから再試行してください。'));return}resolve(dataUrl.split(',')[1])};
+        source.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('画像を開けませんでした。別の写真を選んでください。'))};source.src=url;
+      });
+    }
+    document.querySelector('#geminiTranscribe').addEventListener('click',async()=>{
+      if(!lastOcrImage){setScanStatus('先にカメラ撮影または写真選択をしてください。',true);return}
+      const endpoint=aiEndpoint.value.trim();if(!endpoint){setScanStatus('先に「AI表記整理の接続設定」でWorker URLを保存してください。',true);document.querySelector('.ai-settings').open=true;aiEndpoint.focus();return}
+      let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setScanStatus('Worker URLの形式を確認してください。',true);return}
+      if(!confirm('画像そのものをCloudflare Worker経由でGoogle Gemini APIへ送信して文字起こしします。画像内に氏名・IDなどが写っている実患者の依頼書は送らないでください。無料枠では送信内容がGoogleのサービス改善に使われる場合があります。架空・匿名化した画像、または施設で承認された画像ですか？'))return;
+      const button=document.querySelector('#geminiTranscribe');button.disabled=true;setScanStatus('画像を圧縮してGeminiで文字起こししています…');
+      try{const imageBase64=await compressImageForGemini(lastOcrImage);const response=await fetch(parsed.href.replace(/\/$/, '')+'/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageBase64,mimeType:'image/jpeg'})});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）`);if(typeof payload.text!=='string'||!payload.text.trim())throw new Error('Geminiから文字起こし結果が返りませんでした。');ocrText.value=payload.text.trim();document.querySelector('#ocrConfidence').textContent='Gemini文字起こし案（画像をAIへ送信済み・精度保証なし。原文と必ず照合してください）';ocrReview.classList.remove('hidden');setScanStatus('Geminiの結果を確認・修正してください。依頼文への反映はまだ行われていません。');ocrText.focus()}
+      catch(error){setScanStatus(error.message||'Gemini文字起こしに失敗しました。Worker設定を確認してください。',true)}finally{button.disabled=false}
+    });
+    document.querySelector('#applyOcr').addEventListener('click',()=>{const recognized=ocrText.value.trim();if(!recognized){setScanStatus('読み取り結果が空です。',true);return}request.value=request.value.trim()?`${request.value.trim()}\n${recognized}`:recognized;request.dispatchEvent(new Event('input',{bubbles:true}));lastOcrImage=null;ocrReview.classList.add('hidden');request.focus();setScanStatus('確認済みの読み取り結果を反映しました。候補を確認してください。')});
+    document.querySelector('#discardOcr').addEventListener('click',()=>{ocrText.value='';lastOcrImage=null;ocrReview.classList.add('hidden');setScanStatus('読み取り結果を破棄しました。')});
     document.querySelector('#startCamera').addEventListener('click',startCamera);
     document.querySelector('#stopCamera').addEventListener('click',stopCamera);
     document.querySelector('#takePhoto').addEventListener('click',()=>{if(!video.videoWidth){setScanStatus('カメラ映像の準備中です。少し待ってからもう一度押してください。',true);return}const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0);stopCamera();canvas.toBlob(blob=>{if(blob)recognizeImage(blob);else setScanStatus('撮影画像を作成できませんでした。',true)},'image/jpeg',.92)});
@@ -6407,7 +6424,7 @@
       acceptedAiTerms=[...new Set(selected.map(item=>item.canonicalTerm))];aiReview.classList.add('hidden');analyze();setScanStatus('選択した用語を候補検索に反映しました。原文は変更していません。');
     });
     document.querySelector('#discardAiTerms').addEventListener('click',()=>{aiSuggestions=[];acceptedAiTerms=[];aiReview.classList.add('hidden');setScanStatus('AIの言い換え案を破棄しました。')});
-    document.querySelector('#clear').addEventListener('click',()=>{stopCamera();request.value='';modality.value='auto';region.value='';acceptedAiTerms=[];aiSuggestions=[];aiReview.classList.add('hidden');setScanStatus('');document.querySelector('#results').classList.add('hidden');document.querySelector('#placeholder').classList.remove('hidden');request.focus()});
+    document.querySelector('#clear').addEventListener('click',()=>{stopCamera();lastOcrImage=null;ocrText.value='';ocrReview.classList.add('hidden');request.value='';modality.value='auto';region.value='';acceptedAiTerms=[];aiSuggestions=[];aiReview.classList.add('hidden');setScanStatus('');document.querySelector('#results').classList.add('hidden');document.querySelector('#placeholder').classList.remove('hidden');request.focus()});
     window.addEventListener('pagehide',()=>{stopCamera();if(ocrWorker){ocrWorker.terminate();ocrWorker=null}});
     function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function analyze(){
