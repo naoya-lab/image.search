@@ -80,6 +80,13 @@ export const CANONICAL_TERMS = new Set([
   '酸素需要増加',
   '酸素投与量増加',
   '呼吸状態悪化',
+  '腰痛',
+  '腰部痛',
+  '下肢痛',
+  '下肢放散痛',
+  '腰坐骨神経痛',
+  '下肢しびれ',
+  '腰から足にかけての痛み',
 ]);
 
 const corsHeaders = (origin) => ({
