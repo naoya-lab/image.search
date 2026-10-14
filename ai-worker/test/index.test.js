@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import worker, { CANONICAL_TERMS } from '../src/index.js';
 
 const makeEnv = (limit = { success: true }) => ({
-  OPENAI_API_KEY: 'test-key',
+  GEMINI_API_KEY: 'test-key',
   AI_RATE_LIMITER: { limit: async () => limit },
 });
 
@@ -22,15 +22,17 @@ test('rejects origins outside the configured GitHub Pages origin', async () => {
 test('returns only allowlisted terms and source phrases present in the input', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async (_url, options) => {
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.1-flash-lite:generateContent$/);
+    assert.equal(options.headers['x-goog-api-key'], 'test-key');
     const body = JSON.parse(options.body);
-    assert.equal(body.store, false);
-    assert.equal(body.text.format.type, 'json_schema');
-    return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ matches: [
+    assert.equal(body.generationConfig.responseMimeType, 'application/json');
+    assert.deepEqual(body.generationConfig.responseSchema.required, ['matches']);
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ matches: [
       { sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' },
       { sourcePhrase: 'ここにない語', canonicalTerm: '脳卒中' },
       { sourcePhrase: '頭痛', canonicalTerm: '未知の用語' },
-    ] }) }] }] });
+    ] }) }] } }] });
   };
 
   const response = await worker.fetch(makeRequest({ text: 'ろれつが回らないため受診。' }), makeEnv());
@@ -59,6 +61,6 @@ test('keeps the Worker allowlist synchronized with the UI trigger vocabulary', (
   const rulesText = html.match(/const rules = \[([\s\S]*?)\n    \];/);
   assert.ok(rulesText, 'could not find UI rules array');
   const rules = Function(`return [${rulesText[1]}]`)();
-  const uiTerms = new Set(rules.flatMap((rule) => rule.trigger.flat()));
+  const uiTerms = new Set(rules.flatMap((rule) => rule.terms));
   assert.deepEqual([...CANONICAL_TERMS].sort(), [...uiTerms].sort());
 });
