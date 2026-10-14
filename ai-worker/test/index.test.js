@@ -40,6 +40,14 @@ test('returns only allowlisted terms and source phrases present in the input', a
   assert.deepEqual(await response.json(), { matches: [{ sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' }] });
 });
 
+test('requires a Gemini key in the Worker secret', async () => {
+  const env = makeEnv();
+  delete env.GEMINI_API_KEY;
+  const response = await worker.fetch(makeRequest({ text: '頭痛' }), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /GEMINI_API_KEY/);
+});
+
 test('rejects overlong text before calling the model', async () => {
   const response = await worker.fetch(makeRequest({ text: 'あ'.repeat(4001) }), makeEnv());
   assert.equal(response.status, 400);
