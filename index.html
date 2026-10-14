@@ -2387,6 +2387,85 @@
       ],
       "scope": "日本医学放射線学会 画像診断ガイドライン2026を要約。超音波が第一選択、診断困難時は単純MRI、必要時にCTを検討します。緊急度を含む個別判断が必要です。"
     }
+  ,
+    {
+      "region": "心臓・大血管",
+      "trigger": [
+        [
+          "Adamkiewicz"
+        ],
+        [
+          "アダムキュービッツ"
+        ],
+        [
+          "胸部大動脈瘤",
+          "術前"
+        ],
+        [
+          "胸腹部大動脈瘤",
+          "術前"
+        ],
+        [
+          "大動脈瘤",
+          "脊髄"
+        ],
+        [
+          "ステントグラフト",
+          "Adamkiewicz"
+        ],
+        [
+          "ステントグラフト内挿術",
+          "術前",
+          "脊髄"
+        ]
+      ],
+      "terms": [
+        "Adamkiewicz動脈",
+        "アダムキュービッツ動脈",
+        "大前根髄動脈",
+        "胸部大動脈瘤",
+        "胸腹部大動脈瘤",
+        "大動脈瘤術前",
+        "ステントグラフト内挿術",
+        "脊髄障害",
+        "脊髄虚血"
+      ],
+      "conditions": [
+        [
+          "Adamkiewicz動脈の術前同定",
+          "胸部下行・胸腹部大動脈瘤の手術計画で検討される項目です。術後脊髄障害を防ぐ効果の根拠は十分でないと2021年版は記載しています。"
+        ],
+        [
+          "術後脊髄障害リスク",
+          "動脈の同定だけでリスクを判断できません。術式、治療範囲、側副血行、施設の脊髄保護方針と合わせて評価します。"
+        ]
+      ],
+      "protocols": [
+        [
+          "造影CT／CTA（Adamkiewicz動脈評価）",
+          "2021年版ではCTを実施しやすい第一候補とし、診断困難時にMRI追加を検討しています。分節動脈から脊柱管内を上行し前脊髄動脈に合流する連続性・ヘアピン状走行を評価する考え方です。具体的な撮像条件は同版で一律指定されていません。",
+          "CT"
+        ],
+        [
+          "MRI／MRA（Adamkiewicz動脈評価）",
+          "CTで評価困難な場合などに検討する旧版候補です。撮像法は装置性能・施設手順に依存し、2021年版は一律のシーケンス条件を指定していません。",
+          "MRI"
+        ]
+      ],
+      "checks": [
+        "大動脈瘤の部位、術式、予定治療範囲・ランディングゾーン",
+        "既存CT/MRI、造影可否、腎機能、MRI禁忌・デバイス",
+        "心臓血管外科・血管外科・放射線科の術前評価と施設の脊髄保護手順"
+      ],
+      "sources": [
+        {
+          "title": "画像診断ガイドライン2021年版 FQ3：大動脈瘤術前のAdamkiewicz動脈評価（旧版）",
+          "url": "https://www.radiology.jp/content/files/gl2021/gl_2021_04.pdf",
+          "updated": "2021-09-30"
+        }
+      ],
+      "scope": "【旧版参考・2021年版】FQ3。2026年版の心血管領域一覧に同じ設問は掲載されていません。2021年版自身もエビデンス不十分と記載しており、現行の標準推奨を意味しません。最新の専門科方針・施設プロトコルで必ず確認してください。"
+    }
   ];
     const request = document.querySelector('#request'), modality = document.querySelector('#modality'), region = document.querySelector('#region');
     const statusEl=document.querySelector('#scanStatus'), cameraPanel=document.querySelector('#cameraPanel'), video=document.querySelector('#cameraVideo'), ocrReview=document.querySelector('#ocrReview'), ocrText=document.querySelector('#ocrText');
