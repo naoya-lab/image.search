@@ -36,7 +36,7 @@ test('returns normalized terms beyond the fixed vocabulary only for source phras
     ] }) }] } }] });
   };
 
-  const response = await worker.fetch(makeRequest({ text: 'ろれつが回らないため受診。' }), makeEnv());
+  const response = await worker.fetch(makeRequest({ text: 'ろれつが回らないため受診。頭痛あり。' }), makeEnv());
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { matches: [
     { sourcePhrase: 'ろれつが回らない', canonicalTerm: '構音障害' },
