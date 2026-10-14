@@ -29,7 +29,7 @@ GitHub Pagesは静的サイトです。Gemini APIキーをHTMLやブラウザ設
 
 ### Workerの初回デプロイ
 
-1. OpenAIのAPIキーを用意します。キーはGitHubへ登録・貼り付けしないでください。
+1. Google AI StudioでGemini APIキーを作成します。キーはGitHubへ登録・貼り付けしないでください。
 2. Google AI StudioでGemini APIキーを作成します。Cloudflare WorkerのSecret名は `GEMINI_API_KEY` にしてください（既存Secretが `OPENAI_API_KEY` という名前の場合、Workerからは読み取れません）。Node.jsをインストールした端末でこのリポジトリを取得し、ターミナルで `ai-worker` フォルダへ移動します。
 3. 次を順に実行します。
 
