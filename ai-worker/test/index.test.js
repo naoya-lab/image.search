@@ -47,9 +47,11 @@ test('returns normalized terms beyond the fixed vocabulary only for source phras
 test('explains an upstream 503 as temporary unavailability', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
-  globalThis.fetch = async () => new Response('unavailable', { status: 503 });
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return new Response('unavailable', { status: 503 }); };
   const response = await worker.fetch(makeRequest({ text: '頭痛' }), makeEnv());
   assert.equal(response.status, 502);
+  assert.equal(calls, 3);
   assert.match((await response.json()).error, /一時的に利用できません/);
 });
 
