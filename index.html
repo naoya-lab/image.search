@@ -89,6 +89,13 @@
             </div>
             <div class="scan-actions"><button class="primary" id="saveFacilityProtocol" type="submit">施設プロトコルを保存</button><button class="secondary" id="cancelFacilityEdit" type="button">入力をクリア</button><span id="facilitySaveStatus" class="scan-note" role="status"></span></div>
           </form>
+          <p class="hint">登録内容はこのブラウザに自動保存され、ページを再読み込みしても残ります。別の端末・ブラウザへ移す場合や、保存領域の消失に備える場合はバックアップを保存してください。</p>
+          <div class="scan-actions" aria-label="施設プロトコルのバックアップ">
+            <button class="secondary" id="exportFacilityProtocols" type="button">登録内容をバックアップ</button>
+            <button class="secondary" id="importFacilityProtocols" type="button">バックアップから復元</button>
+            <input id="facilityBackupFile" type="file" accept="application/json,.json" hidden>
+            <span id="facilityBackupStatus" class="scan-note" role="status"></span>
+          </div>
           <div id="facilityProtocolList" class="facility-list"></div>
         </details>
 
@@ -6285,6 +6292,31 @@
     const facilityForm=document.querySelector('#facilityProtocolForm'), facilityList=document.querySelector('#facilityProtocolList');
     let facilityProtocols=[], editingFacilityProtocolId=null;
     try{const saved=JSON.parse(localStorage.getItem(FACILITY_PROTOCOL_KEY)||'[]');if(Array.isArray(saved))facilityProtocols=saved.filter(p=>p&&typeof p.id==='string'&&typeof p.name==='string'&&typeof p.region==='string'&&Array.isArray(p.terms)&&p.phases&&typeof p.phases==='object')}catch{document.querySelector('#facilitySaveStatus').textContent='保存済みの施設プロトコルを読み込めませんでした。'}
+    const exportFacilityProtocolsButton=document.querySelector('#exportFacilityProtocols'), importFacilityProtocolsButton=document.querySelector('#importFacilityProtocols'), facilityBackupFile=document.querySelector('#facilityBackupFile'), facilityBackupStatus=document.querySelector('#facilityBackupStatus');
+    exportFacilityProtocolsButton.addEventListener('click',()=>{
+      const backup={format:'imaging-assist-facility-protocols',version:1,exportedAt:new Date().toISOString(),protocols:facilityProtocols};
+      const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='imaging-assist-facility-protocols-backup.json';link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      facilityBackupStatus.textContent='バックアップファイルを作成しました。ファイルアプリ等で保存先を確認してください。';
+    });
+    importFacilityProtocolsButton.addEventListener('click',()=>facilityBackupFile.click());
+    facilityBackupFile.addEventListener('change',async event=>{
+      const file=event.target.files?.[0];event.target.value='';if(!file)return;
+      if(file.size>1024*1024){facilityBackupStatus.textContent='バックアップは1 MB以下のJSONファイルを選択してください。';return}
+      try{
+        const backup=JSON.parse(await file.text());
+        if(backup?.format!=='imaging-assist-facility-protocols'||backup?.version!==1||!Array.isArray(backup.protocols))throw new Error('このアプリのバックアップ形式ではありません。');
+        const valid=backup.protocols.filter(p=>p&&typeof p.name==='string'&&typeof p.modality==='string'&&typeof p.region==='string'&&Array.isArray(p.terms)&&p.terms.every(t=>typeof t==='string')&&p.phases&&['arterial','portal','equilibrium','venous'].every(k=>['unset','yes','no'].includes(p.phases[k])));
+        if(valid.length!==backup.protocols.length)throw new Error('バックアップ内に読み込めない項目があります。登録内容は変更していません。');
+        const identity=p=>p.id||[p.name,p.modality,p.region].join('\u0000');
+        const merged=new Map(facilityProtocols.map(p=>[identity(p),p]));
+        valid.forEach(p=>{const key=identity(p);if(!merged.has(key))merged.set(key,p)});
+        const before=facilityProtocols.length;facilityProtocols=[...merged.values()];
+        if(!saveFacilityProtocols()){facilityProtocols=facilityProtocols.slice(0,before);return}
+        renderFacilityProtocols();facilityBackupStatus.textContent=(facilityProtocols.length-before)+'件を復元しました（既存の登録は保持）。';
+      }catch(error){facilityBackupStatus.textContent=error.message||'バックアップを読み込めませんでした。'}
+    });
     function phaseLabel(value){return value==='yes'?'あり':value==='no'?'なし':'未設定'}
     function saveFacilityProtocols(){try{localStorage.setItem(FACILITY_PROTOCOL_KEY,JSON.stringify(facilityProtocols));return true}catch{document.querySelector('#facilitySaveStatus').textContent='ブラウザ保存に失敗しました。空き容量やプライベートブラウズ設定を確認してください。';return false}}
     function renderFacilityProtocols(){
