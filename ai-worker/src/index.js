@@ -40,13 +40,8 @@ function normalize(value) {
 }
 
 function extractOutputText(payload) {
-  for (const item of payload.output || []) {
-    if (item.type !== 'message') continue;
-    for (const part of item.content || []) {
-      if (part.type === 'output_text' && typeof part.text === 'string') return part.text;
-    }
-  }
-  return '';
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  return parts.filter((part) => typeof part.text === 'string').map((part) => part.text).join('');
 }
 
 function validateMatches(value, sourceText) {
@@ -94,26 +89,24 @@ export default {
     }
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     if (!text || text.length > 4000) return json({ error: '依頼文は1〜4000文字で入力してください。' }, 400, origin);
-    if (!env.OPENAI_API_KEY) return json({ error: 'WorkerにOPENAI_API_KEYが設定されていません。' }, 503, origin);
+    if (!env.GEMINI_API_KEY) return json({ error: 'WorkerにGEMINI_API_KEYが設定されていません。CloudflareのSecretsを確認してください。' }, 503, origin);
 
-    const schema = {
-      type: 'object',
+    const responseSchema = {
+      type: 'OBJECT',
       properties: {
         matches: {
-          type: 'array',
+          type: 'ARRAY',
           items: {
-            type: 'object',
+            type: 'OBJECT',
             properties: {
-              sourcePhrase: { type: 'string' },
-              canonicalTerm: { type: 'string', enum: [...CANONICAL_TERMS] },
+              sourcePhrase: { type: 'STRING' },
+              canonicalTerm: { type: 'STRING', enum: [...CANONICAL_TERMS] },
             },
             required: ['sourcePhrase', 'canonicalTerm'],
-            additionalProperties: false,
           },
         },
       },
       required: ['matches'],
-      additionalProperties: false,
     };
     const instructions = [
       'あなたは日本語の放射線検査依頼文に含まれる表記ゆれを正規化する補助器です。',
@@ -127,25 +120,35 @@ export default {
 
     let upstream;
     try {
-      upstream = await fetch('https://api.openai.com/v1/responses', {
+      upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+          'x-goog-api-key': env.GEMINI_API_KEY,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          store: false,
-          max_output_tokens: 500,
-          instructions,
-          input: `登録済み用語:\n${[...CANONICAL_TERMS].join('、')}\n\n依頼文:\n${text}`,
-          text: { format: { type: 'json_schema', name: 'term_normalization', strict: true, schema } },
+          systemInstruction: { parts: [{ text: instructions }] },
+          contents: [{
+            role: 'user',
+            parts: [{ text: `登録済み用語:\n${[...CANONICAL_TERMS].join('、')}\n\n依頼文:\n${text}` }],
+          }],
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 500,
+            responseMimeType: 'application/json',
+            responseSchema,
+          },
         }),
       });
     } catch {
       return json({ error: 'AIサービスに接続できませんでした。時間をおいて再試行してください。' }, 502, origin);
     }
-    if (!upstream.ok) return json({ error: 'AIサービスからエラーが返りました。WorkerのAPI設定を確認してください。' }, 502, origin);
+    if (!upstream.ok) {
+      const message = upstream.status === 429
+        ? 'Gemini APIの利用上限に達した可能性があります。AI Studioの利用量を確認してください。'
+        : `Gemini APIがリクエストを拒否しました（HTTP ${upstream.status}）。APIキー、モデル、利用設定を確認してください。`;
+      return json({ error: message }, 502, origin);
+    }
 
     let result;
     try {
