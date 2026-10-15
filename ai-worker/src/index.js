@@ -264,7 +264,7 @@ export default {
       'canonicalTermはsourcePhraseと同じ意味の短い標準的な医学用語にします。別の意味への一般化・病名化はしません。一般的な同義語が不明ならsourcePhraseをそのままcanonicalTermにしてください。',
       '否定・既往・疑い・鑑別の区別を保ち、曖昧な語や患者氏名、ID、生年月日など個人識別情報は含めないでください。',
       '同じ内容の重複をまとめ、最大30件までにしてください。categoryは symptom, disease, injury, anatomy, exam_purpose, other のいずれかです。',
-    ].join('\\n');
+    ].join('\n');
     const normalizeInstructions = [
       'あなたは日本語の放射線検査依頼文に含まれる表記ゆれを正規化する補助器です。',
       '依頼文に明記された症状・病名・検査目的の表現を、一般的な医療用語へ整理します。固定の登録語リストにない用語も出力できます。',
@@ -276,11 +276,11 @@ export default {
       '典型例:「頭がズキズキする」→「頭痛」、「胸が締め付けられる」→「胸痛」、「お腹が痛い」→「腹痛」、「息が苦しい」→「呼吸困難」、「SpO2が下がっている」→「SpO2低下」、「腰が痛い」→「腰痛」、「脚がしびれる」→「下肢のしびれ」、「首が痛い」→「頸部痛」、「熱が続く」→「発熱」。',
       '候補用語は同じ意味が本文から明確な場合だけ選び、複数候補なら本文が直接支える最も具体的な用語だけを選びます。否定・疑い・既往の区別を保持します。',
       '症状から病名・原因を推測せず、依頼文に明記された内容の範囲を保ってください。検査適応、撮像プロトコル、緊急度は出力しません。canonicalTermは短い一般的な医療用語（80文字以内）にしてください。',
-    ].join('\\n');
+    ].join('\n');
     const instructions = extractionMode ? extractionInstructions : normalizeInstructions;
     const userPrompt = extractionMode
-      ? `次の検査指示文だけを根拠に、明記された症状、病名・病態、外傷、部位、検査目的を新規登録用語として抽出してください。固定キーワードや既存辞書は使わず、本文にない診断や撮像法は追加しないでください。sourcePhraseは原文の短い連続部分文字列にし、canonicalTermは同じ意味の医学用語にしてください。カテゴリも付けてください。該当するものがなければtermsを空配列にします。\\n\\n検査指示文:\\n${text}`
-      : `依頼文に書かれた症状・病名・検査目的を、診断や撮像法を新たに推測せず、同じ意味の一般的な医療用語に整理してください。固定リストに限定しません。sourcePhraseは原文の短い連続部分文字列、canonicalTermは対応する短い標準用語にします。\\n\\n依頼文:\\n${text}`;
+      ? `次の検査指示文だけを根拠に、明記された症状、病名・病態、外傷、部位、検査目的を新規登録用語として抽出してください。固定キーワードや既存辞書は使わず、本文にない診断や撮像法は追加しないでください。sourcePhraseは原文の短い連続部分文字列にし、canonicalTermは同じ意味の医学用語にしてください。カテゴリも付けてください。該当するものがなければtermsを空配列にします。\n\n検査指示文:\n${text}`
+      : `依頼文に書かれた症状・病名・検査目的を、診断や撮像法を新たに推測せず、同じ意味の一般的な医療用語に整理してください。固定リストに限定しません。sourcePhraseは原文の短い連続部分文字列、canonicalTermは対応する短い標準用語にします。\n\n依頼文:\n${text}`;
 
     let upstream;
     const callGemini = async () => {
@@ -345,10 +345,10 @@ export default {
       const sourcePhrase = item.sourcePhrase.trim().slice(0, 100);
       const canonicalTerm = item.canonicalTerm.trim();
       const category = allowedCategories.has(item.category) ? item.category : 'other';
-      if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\\r\\n\\u0000-\\u001f]/.test(canonicalTerm)) return [];
+      if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\r\n\u0000-\u001f]/.test(canonicalTerm)) return [];
       if (!normalizedSource.includes(normalize(sourcePhrase))) return [];
       return [{ sourcePhrase, canonicalTerm, category }];
     });
-    return json({ terms: [...new Map(terms.map((item) => [`${item.sourcePhrase}\\u0000${item.canonicalTerm}`, item])).values()].slice(0, 30) }, 200, origin);
+    return json({ terms: [...new Map(terms.map((item) => [`${item.sourcePhrase}\u0000${item.canonicalTerm}`, item])).values()].slice(0, 30) }, 200, origin);
   },
 };
