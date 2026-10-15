@@ -40,7 +40,7 @@
           <div><label class="field-label" for="modality">モダリティ</label><select id="modality"><option value="auto">自動で候補を表示</option><option value="CT">CT</option><option value="MRI">MRI</option></select></div>
         <div><label class="field-label" for="region">撮影部位 <span class="hint">任意</span></label><select id="region"><option value="">依頼文から推定</option><option value="全身">全身・部位未指定</option><option>頭部</option><option>頭頸部</option><option>胸部</option><option>心臓・大血管</option><option>腹部・骨盤</option><option>骨盤・婦人科</option><option>泌尿器</option><option>脊椎</option><option>関節・骨</option><option>乳房</option><option>小児（全身）</option></select></div>
         </div>
-        <div class="scan-actions"><button class="primary" id="startCamera" type="button">📷 カメラで依頼文を撮影</button><button class="secondary" id="chooseImage" type="button">写真を選んでGeminiで文字起こし</button><input id="imageFile" type="file" accept="image/*" capture="environment" hidden></div>
+        <div class="scan-actions"><button class="primary" id="startCamera" type="button">📷 カメラを起動</button></div>
         <section class="keyword-picker" aria-labelledby="keywordPickerTitle">
           <div class="keyword-picker-head"><h3 id="keywordPickerTitle">登録キーワードから選ぶ <span>五十音</span></h3><p>タップした語を依頼文に追加します。複数選択できます。</p></div>
           <label class="sr-only" for="keywordSearch">キーワードを検索</label>
@@ -50,7 +50,7 @@
         </section>
         <label class="field-label" for="request">依頼文 <span class="hint">手入力または上のボタンから読み取り · 入力すると候補を自動更新</span></label>
         <textarea id="request" placeholder="例：突然の構音障害。脳梗塞疑い。発症時刻は約2時間前。"></textarea>
-        <section class="scan-panel hidden" id="cameraPanel" aria-label="依頼文をカメラで撮影"><video id="cameraVideo" autoplay playsinline muted></video><div class="scan-actions"><button class="primary" id="takePhoto" type="button">撮影してGeminiで文字起こし</button><button class="secondary" id="stopCamera" type="button">カメラを閉じる</button></div></section>
+        <section class="scan-panel hidden" id="cameraPanel" aria-label="依頼文を撮影または写真選択"><video id="cameraVideo" autoplay playsinline muted></video><div class="scan-actions"><button class="primary" id="takePhoto" type="button">カメラで依頼文を撮影</button><button class="secondary" id="chooseImage" type="button">写真を選んでGeminiで文字起こし</button><button class="secondary" id="stopCamera" type="button">カメラを閉じる</button></div><input id="imageFile" type="file" accept="image/*" hidden></section>
         <section class="scan-panel hidden" id="ocrReview" aria-label="Gemini文字起こし結果の確認"><label class="field-label" for="ocrText">Geminiの文字起こし結果を確認・修正</label><textarea id="ocrText" rows="6" aria-describedby="ocrConfidence"></textarea><p class="scan-note" id="ocrConfidence"></p><div class="scan-actions"><button class="primary" id="applyOcr" type="button">確認して依頼文に反映</button><button class="secondary" id="discardOcr" type="button">結果を破棄</button></div></section>
         <p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
         <p class="scan-note">選んだ画像はCloudflare Worker経由でGoogle Geminiへ送信され、文字起こしに使われます。実患者の氏名・IDが写った依頼書は送らず、架空・匿名化した画像、または施設で承認された画像のみ使用してください。文字起こし結果は必ず原文と照合してください。</p>
