@@ -197,8 +197,9 @@ export default {
         return json({ error: 'Geminiの文字起こし結果を読み取れませんでした。もう一度お試しください。' }, 502, origin);
       }
     }
-    if (request.method !== 'POST' || url.pathname !== '/normalize') {
-      return json({ error: 'このURLではPOST /normalizeのみ利用できます。' }, 404, origin);
+    const extractionMode = url.pathname === '/extract-terms';
+    if (request.method !== 'POST' || (!extractionMode && url.pathname !== '/normalize')) {
+      return json({ error: 'このURLではPOST /normalizeまたはPOST /extract-termsのみ利用できます。' }, 404, origin);
     }
     if (!request.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
       return json({ error: 'Content-Typeはapplication/jsonにしてください。' }, 415, origin);
@@ -220,7 +221,24 @@ export default {
     if (!text || text.length > 4000) return json({ error: '依頼文は1〜4000文字で入力してください。' }, 400, origin);
     if (!env.GEMINI_API_KEY) return json({ error: 'WorkerにGEMINI_API_KEYが設定されていません。Google AI StudioのGemini APIキーをCloudflare Secretとして登録してください。' }, 503, origin);
 
-    const responseSchema = {
+    const responseSchema = extractionMode ? {
+      type: 'OBJECT',
+      properties: {
+        terms: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              sourcePhrase: { type: 'STRING' },
+              canonicalTerm: { type: 'STRING' },
+              category: { type: 'STRING', enum: ['symptom', 'disease', 'injury', 'anatomy', 'exam_purpose', 'other'] },
+            },
+            required: ['sourcePhrase', 'canonicalTerm', 'category'],
+          },
+        },
+      },
+      required: ['terms'],
+    } : {
       type: 'OBJECT',
       properties: {
         matches: {
@@ -237,7 +255,17 @@ export default {
       },
       required: ['matches'],
     };
-    const instructions = [
+    const extractionInstructions = [
+      'あなたは検査指示文から登録候補の医療用語を抽出する補助器です。',
+      '固定のキーワード一覧、既存辞書、登録済み語彙を参照したり、それらに限定したりせず、入力文そのものから抽出してください。',
+      '文中に明記された症状・徴候、病名・病態（疑いを含む）、外傷、解剖部位、検査目的を候補にします。登録データにない新しい用語も候補として出してください。',
+      '症状から病名・原因を推測したり、病名から撮像法・プロトコルを推測したり、新しい臨床情報を作ってはいけません。',
+      'sourcePhraseは入力本文に実際に含まれる短い連続部分文字列にしてください。OCR誤りを補完した語をsourcePhraseにしないでください。',
+      'canonicalTermはsourcePhraseと同じ意味の短い標準的な医学用語にします。別の意味への一般化・病名化はしません。一般的な同義語が不明ならsourcePhraseをそのままcanonicalTermにしてください。',
+      '否定・既往・疑い・鑑別の区別を保ち、曖昧な語や患者氏名、ID、生年月日など個人識別情報は含めないでください。',
+      '同じ内容の重複をまとめ、最大30件までにしてください。categoryは symptom, disease, injury, anatomy, exam_purpose, other のいずれかです。',
+    ].join('\\n');
+    const normalizeInstructions = [
       'あなたは日本語の放射線検査依頼文に含まれる表記ゆれを正規化する補助器です。',
       '依頼文に明記された症状・病名・検査目的の表現を、一般的な医療用語へ整理します。固定の登録語リストにない用語も出力できます。',
       '症状から病態・診断を推測してはいけません。症状を病名へ、病名を症状へ変換してはいけません。',
@@ -248,7 +276,11 @@ export default {
       '典型例:「頭がズキズキする」→「頭痛」、「胸が締め付けられる」→「胸痛」、「お腹が痛い」→「腹痛」、「息が苦しい」→「呼吸困難」、「SpO2が下がっている」→「SpO2低下」、「腰が痛い」→「腰痛」、「脚がしびれる」→「下肢のしびれ」、「首が痛い」→「頸部痛」、「熱が続く」→「発熱」。',
       '候補用語は同じ意味が本文から明確な場合だけ選び、複数候補なら本文が直接支える最も具体的な用語だけを選びます。否定・疑い・既往の区別を保持します。',
       '症状から病名・原因を推測せず、依頼文に明記された内容の範囲を保ってください。検査適応、撮像プロトコル、緊急度は出力しません。canonicalTermは短い一般的な医療用語（80文字以内）にしてください。',
-    ].join('\n');
+    ].join('\\n');
+    const instructions = extractionMode ? extractionInstructions : normalizeInstructions;
+    const userPrompt = extractionMode
+      ? `次の検査指示文だけを根拠に、明記された症状、病名・病態、外傷、部位、検査目的を新規登録用語として抽出してください。固定キーワードや既存辞書は使わず、本文にない診断や撮像法は追加しないでください。sourcePhraseは原文の短い連続部分文字列にし、canonicalTermは同じ意味の医学用語にしてください。カテゴリも付けてください。該当するものがなければtermsを空配列にします。\\n\\n検査指示文:\\n${text}`
+      : `依頼文に書かれた症状・病名・検査目的を、診断や撮像法を新たに推測せず、同じ意味の一般的な医療用語に整理してください。固定リストに限定しません。sourcePhraseは原文の短い連続部分文字列、canonicalTermは対応する短い標準用語にします。\\n\\n依頼文:\\n${text}`;
 
     let upstream;
     const callGemini = async () => {
@@ -260,13 +292,10 @@ export default {
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: instructions }] },
-          contents: [{
-            role: 'user',
-            parts: [{ text: `依頼文に書かれた症状・病名・検査目的を、診断や撮像法を新たに推測せず、同じ意味の一般的な医療用語に整理してください。固定リストに限定しません。sourcePhraseは原文の短い連続部分文字列、canonicalTermは対応する短い標準用語にします。\n\n依頼文:\n${text}` }],
-          }],
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
           generationConfig: {
             temperature: 0,
-            maxOutputTokens: 800,
+            maxOutputTokens: extractionMode ? 1400 : 800,
             responseMimeType: 'application/json',
             responseSchema,
           },
@@ -274,7 +303,6 @@ export default {
       });
     };
     try {
-      // Retry transient Gemini outages twice with short exponential backoff.
       for (let attempt = 0; attempt < 3; attempt++) {
         upstream = await callGemini();
         if (![502, 503, 504].includes(upstream.status) || attempt === 2) break;
@@ -287,11 +315,11 @@ export default {
       let message;
       if (upstream.status === 429) {
         message = 'Gemini APIの利用上限に達した可能性があります。AI Studioの利用量とAPI利用設定を確認してください。';
-      } else if (upstream.status === 503 || upstream.status === 502 || upstream.status === 504) {
+      } else if ([503, 502, 504].includes(upstream.status)) {
         message = 'Gemini APIが一時的に利用できません（HTTP ' + upstream.status + '）。APIキーの問題とは限りません。少し時間をおいて再試行してください。';
-      } else if (upstream.status === 401 || upstream.status === 403) {
+      } else if ([401, 403].includes(upstream.status)) {
         message = 'Gemini APIの認証または権限エラー（HTTP ' + upstream.status + '）です。Cloudflare SecretのGEMINI_API_KEY、Google AI Studioのキー状態、Gemini APIの有効化を確認してください。';
-      } else if (upstream.status === 400 || upstream.status === 404) {
+      } else if ([400, 404].includes(upstream.status)) {
         message = 'Gemini APIのリクエストまたはモデル設定エラー（HTTP ' + upstream.status + '）です。Workerのモデル名とAPI設定を確認してください。';
       } else {
         message = 'Gemini APIでエラーが発生しました（HTTP ' + upstream.status + '）。時間をおいて再試行してください。';
@@ -308,6 +336,19 @@ export default {
     } catch {
       return json({ error: 'AIの応答を読み取れませんでした。もう一度お試しください。' }, 502, origin);
     }
-    return json({ matches: validateMatches(result, text) }, 200, origin);
+    if (!extractionMode) return json({ matches: validateMatches(result, text) }, 200, origin);
+
+    const normalizedSource = normalize(text);
+    const allowedCategories = new Set(['symptom', 'disease', 'injury', 'anatomy', 'exam_purpose', 'other']);
+    const terms = (Array.isArray(result.terms) ? result.terms : []).flatMap((item) => {
+      if (!item || typeof item.sourcePhrase !== 'string' || typeof item.canonicalTerm !== 'string') return [];
+      const sourcePhrase = item.sourcePhrase.trim().slice(0, 100);
+      const canonicalTerm = item.canonicalTerm.trim();
+      const category = allowedCategories.has(item.category) ? item.category : 'other';
+      if (!sourcePhrase || !canonicalTerm || canonicalTerm.length > 80 || /[\\r\\n\\u0000-\\u001f]/.test(canonicalTerm)) return [];
+      if (!normalizedSource.includes(normalize(sourcePhrase))) return [];
+      return [{ sourcePhrase, canonicalTerm, category }];
+    });
+    return json({ terms: [...new Map(terms.map((item) => [`${item.sourcePhrase}\\u0000${item.canonicalTerm}`, item])).values()].slice(0, 30) }, 200, origin);
   },
 };
