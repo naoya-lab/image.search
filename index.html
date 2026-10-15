@@ -76,7 +76,7 @@
           <p class="hint">施設で承認済みの手順だけ登録してください。依頼文または選択済みGemini用語と登録語が一致すると候補に表示します。プロトコル名・部位・各相・照合語はこのブラウザに保存し、Geminiへは送信しません。</p>
           <section class="facility-scan" aria-labelledby="facilityScanTitle">
             <h3 id="facilityScanTitle">依頼書を撮影して登録用語を作成</h3>
-            <p class="hint">カメラ撮影または写真選択 → Gemini文字起こし → 原文確認 → Gemini用語案を確認、の順で進みます。選んだ用語は登録フォームに追加されますが、自動保存はされません。</p>
+            <p class="hint">カメラ撮影または写真選択 → Gemini文字起こし → 原文確認 → Gemini抽出、の順です。AIは既存キーワード一覧を参照せず、指示文に明記された症状・病名・病態・部位・検査目的から用語案を作ります。既登録語を除いた新規候補だけを表示します。選んだ語はフォームに追加されますが、自動保存はされません。</p>
             <div class="scan-actions">
               <button class="primary" id="facilityStartCamera" type="button">📷 カメラを起動</button>
               <button class="secondary" id="facilityChooseImage" type="button">写真を選ぶ</button>
@@ -6402,35 +6402,47 @@
         facilityOcrText.value=payload.text.trim();facilityOcrReview.classList.remove('hidden');setFacilityScanStatus('文字起こし案を原文と照合し、必要なら修正してください。用語抽出はまだ行っていません。');
       }catch(error){setFacilityScanStatus(error.message||'文字起こしに失敗しました。Worker設定を確認してください。',true)}
     }
+    function facilityRegisteredTermSet(){
+      const formTerms=facilityForm.querySelector('#facilityProtocolTerms').value.split(/[\n,、，]/).map(term=>term.trim()).filter(Boolean);
+      const savedTerms=facilityProtocols.flatMap(protocol=>Array.isArray(protocol.terms)?protocol.terms:[]);
+      return new Set([...Object.values(keywordRows).flat(),...allowedCanonicalTerms,...savedTerms,...formTerms].map(normalizedText).filter(Boolean));
+    }
+    const facilityCategoryLabels={symptom:'症状・徴候',disease:'病名・病態',injury:'外傷',anatomy:'部位',exam_purpose:'検査目的',other:'その他'};
     document.querySelector('#facilityExtractTerms').addEventListener('click',async()=>{
       const text=facilityOcrText.value.trim(),endpoint=aiEndpoint.value.trim();
       if(!text){setFacilityScanStatus('先に文字起こし結果を確認してください。',true);facilityOcrText.focus();return}
       if(text.length>4000){setFacilityScanStatus('文章は4000文字以内にしてください。',true);return}
       let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setFacilityScanStatus('AI Worker URLの形式を確認してください。',true);return}
-      if(!confirm('確認した文字起こし文章をGoogle Geminiへ送信し、登録用語案を作成します。患者氏名・IDなどの個人情報が含まれていないことを確認してください。続けますか？'))return;
-      const button=document.querySelector('#facilityExtractTerms');button.disabled=true;facilityTermReview.classList.add('hidden');setFacilityScanStatus('Geminiで登録用語案を作成しています…');
+      if(!confirm('確認した文字起こし文章をGoogle Geminiへ送信します。Geminiは既存キーワード一覧を参照せず、指示文中の明記された症状・病名・病態などを抽出します。患者氏名・IDなどが含まれていないことを確認してください。続けますか？'))return;
+      const button=document.querySelector('#facilityExtractTerms');button.disabled=true;facilityTermReview.classList.add('hidden');setFacilityScanStatus('Geminiが指示文から用語を抽出しています…');
       try{
-        const response=await fetch(parsed.href.replace(/\/$/,'')+'/normalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+        const response=await fetch(parsed.href.replace(/\/$/,'')+'/extract-terms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
         const payload=await response.json().catch(()=>({}));
-        if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）`);
-        const inputNormalized=normalizedText(text);
-        facilityExtractedTerms=[...new Map((Array.isArray(payload.matches)?payload.matches:[])
+        if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）。Workerを更新・再デプロイしてください。`);
+        const inputNormalized=normalizedText(text),registered=facilityRegisteredTermSet();
+        const categoryKeys=new Set(Object.keys(facilityCategoryLabels));
+        const extracted=[...new Map((Array.isArray(payload.terms)?payload.terms:[])
           .filter(item=>item&&typeof item.sourcePhrase==='string'&&typeof item.canonicalTerm==='string'&&item.canonicalTerm.trim().length>0&&item.canonicalTerm.trim().length<=80&&inputNormalized.includes(normalizedText(item.sourcePhrase)))
-          .map(item=>[`${item.sourcePhrase}\u0000${item.canonicalTerm}`,{sourcePhrase:item.sourcePhrase,canonicalTerm:item.canonicalTerm.trim()}])).values()];
+          .map(item=>[item.sourcePhrase+'\u0000'+item.canonicalTerm,{sourcePhrase:item.sourcePhrase.trim(),canonicalTerm:item.canonicalTerm.trim(),category:categoryKeys.has(item.category)?item.category:'other'}])).values()];
+        facilityExtractedTerms=extracted.filter(item=>!registered.has(normalizedText(item.sourcePhrase))||!registered.has(normalizedText(item.canonicalTerm)));
         facilityTermOptions.replaceChildren();
-        if(!facilityExtractedTerms.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='用語候補が見つかりませんでした。原文を確認し、下の登録フォームへ手入力してください。';facilityTermOptions.append(empty)}
-        facilityExtractedTerms.forEach((item,index)=>{const label=document.createElement('label');label.className='ai-option';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(index);checkbox.checked=true;const content=document.createElement('span');content.append(document.createTextNode(item.sourcePhrase===item.canonicalTerm?item.canonicalTerm:`${item.sourcePhrase} → ${item.canonicalTerm}`));const detail=document.createElement('small');detail.textContent='原文にある表現からの登録用語案';content.append(detail);label.append(checkbox,content);facilityTermOptions.append(label)});
-        facilityTermReview.classList.remove('hidden');setFacilityScanStatus('用語案を確認し、登録する語だけ選択してください。プロトコルはまだ保存されていません。');
+        if(!extracted.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='指示文から明確な症状・病名・病態などを抽出できませんでした。原文を確認し、必要なら下のフォームへ手入力してください。';facilityTermOptions.append(empty)}
+        else if(!facilityExtractedTerms.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='抽出した用語はすべて登録済みです。新規候補はありません。';facilityTermOptions.append(empty)}
+        facilityExtractedTerms.forEach((item,index)=>{const label=document.createElement('label');label.className='ai-option';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(index);checkbox.checked=true;const content=document.createElement('span');content.append(document.createTextNode(item.sourcePhrase===item.canonicalTerm?item.canonicalTerm:`${item.sourcePhrase} → ${item.canonicalTerm}`));const detail=document.createElement('small');detail.textContent='新規候補 · '+facilityCategoryLabels[item.category];content.append(detail);label.append(checkbox,content);facilityTermOptions.append(label)});
+        facilityTermReview.classList.remove('hidden');setFacilityScanStatus(`抽出${extracted.length}件から登録済み語を除き、新規候補${facilityExtractedTerms.length}件を表示しました。内容を確認してください。`);
       }catch(error){setFacilityScanStatus(error.message||'用語抽出に失敗しました。Worker設定を確認してください。',true)}
       finally{button.disabled=false}
     });
     document.querySelector('#facilityAddTerms').addEventListener('click',()=>{
       const selected=[...facilityTermOptions.querySelectorAll('input[type="checkbox"]:checked')].map(input=>facilityExtractedTerms[Number(input.value)]).filter(Boolean);
       if(!selected.length){setFacilityScanStatus('登録する用語を1つ以上選択してください。',true);return}
-      const existing=facilityForm.querySelector('#facilityProtocolTerms').value.split(/[\n,、，]/).map(term=>term.trim()).filter(Boolean);
-      const merged=[...new Set([...existing,...selected.flatMap(item=>[item.sourcePhrase,item.canonicalTerm])])];
-      facilityForm.querySelector('#facilityProtocolTerms').value=merged.join('\n');
-      facilityTermReview.classList.add('hidden');facilityForm.querySelector('#facilityProtocolTerms').focus();setFacilityScanStatus(`${selected.length}件の用語案をフォームに追加しました。プロトコル名・部位などを確認して保存してください。`);
+      const registered=facilityRegisteredTermSet(),toAdd=[];
+      selected.forEach(item=>[item.sourcePhrase,item.canonicalTerm].forEach(term=>{const key=normalizedText(term);if(key&&!registered.has(key)){registered.add(key);toAdd.push(term)}}));
+      if(!toAdd.length){facilityTermReview.classList.add('hidden');setFacilityScanStatus('選択した用語はすでに登録済みです。追加項目はありません。');return}
+      const termsField=facilityForm.querySelector('#facilityProtocolTerms');
+      const existing=termsField.value.split(/[\n,、，]/).map(term=>term.trim()).filter(Boolean);
+      termsField.value=[...existing,...toAdd].join('\n');
+      facilityTermReview.classList.add('hidden');termsField.focus();setFacilityScanStatus(`${toAdd.length}件の未登録用語をフォームに追加しました。プロトコル名・部位などを確認して保存してください。`);
     });
     document.querySelector('#facilityDiscardTerms').addEventListener('click',()=>{facilityExtractedTerms=[];facilityTermReview.classList.add('hidden');setFacilityScanStatus('用語案を破棄しました。')});
     document.querySelector('#facilityProtocolForm').addEventListener('submit',()=>stopFacilityCamera());
