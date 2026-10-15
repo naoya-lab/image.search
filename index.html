@@ -107,7 +107,7 @@
             <p class="scan-note">画像は文字起こしのためGeminiへ送信され、確認後の文章も用語抽出のためGeminiへ送信されます。患者氏名・IDなどを含む実患者情報は入力・送信しないでください。架空・匿名化した画像、または施設で承認された画像を使用し、文字起こしを原文と照合してください。</p>
           </section>
           <form id="facilityProtocolForm">
-            <label for="facilityProtocolName">プロトコル名</label><input id="facilityProtocolName" required maxlength="100" placeholder="例：腹部造影CT（施設標準）">
+            <label for="facilityProtocolName">プロトコル名 <span class="hint">過去の登録名から選択できます</span></label><input id="facilityProtocolName" required maxlength="100" list="facilityProtocolNameHistory" placeholder="例：腹部造影CT（施設標準）" autocomplete="off"><datalist id="facilityProtocolNameHistory"></datalist><p class="hint">登録済みの名前を選ぶと、既存設定を編集用に読み込みます。新規登録は新しい名前を入力してください。</p>
             <div class="form-grid">
               <div><label for="facilityProtocolModality">検査種</label><select id="facilityProtocolModality"><option value="CT">CT</option><option value="MRI">MRI</option><option value="CT/MRI">CT・MRI</option></select></div>
               <div><label for="facilityProtocolRegion">体の部位</label><input id="facilityProtocolRegion" required maxlength="60" list="facilityRegionOptions" placeholder="例：腹部、頭部、胸部"><datalist id="facilityRegionOptions"><option value="頭部"><option value="頸部"><option value="胸部"><option value="腹部"><option value="骨盤"><option value="腹部・骨盤"><option value="脊椎"><option value="四肢"><option value="全身"></datalist></div>
@@ -6333,6 +6333,12 @@
     function saveFacilityProtocols(){try{localStorage.setItem(FACILITY_PROTOCOL_KEY,JSON.stringify(facilityProtocols));return true}catch{document.querySelector('#facilitySaveStatus').textContent='ブラウザ保存に失敗しました。空き容量やプライベートブラウズ設定を確認してください。';return false}}
     function renderFacilityProtocols(){
       facilityList.replaceChildren();
+      const history=document.querySelector('#facilityProtocolNameHistory');
+      history.replaceChildren();
+      [...new Map([...facilityProtocols].reverse().map(protocol=>[protocol.name.trim(),protocol])).values()].forEach(protocol=>{
+        if(!protocol.name.trim())return;
+        const option=document.createElement('option');option.value=protocol.name;option.label=protocol.modality+' · '+protocol.region;history.append(option);
+      });
       if(!facilityProtocols.length){const empty=document.createElement('p');empty.className='hint';empty.textContent='施設プロトコルはまだ登録されていません。';facilityList.append(empty);return}
       facilityProtocols.forEach(protocol=>{
         const item=document.createElement('div');item.className='facility-item';
@@ -6351,6 +6357,12 @@
       document.querySelector('#phaseArterial').value=p.phases.arterial||'unset';document.querySelector('#phasePortal').value=p.phases.portal||'unset';document.querySelector('#phaseEquilibrium').value=p.phases.equilibrium||'unset';document.querySelector('#phaseVenous').value=p.phases.venous||'unset';
       document.querySelector('#saveFacilityProtocol').textContent='変更を保存';document.querySelector('#facilitySettings').open=true;facilityForm.scrollIntoView({behavior:'smooth',block:'center'});
     }
+    document.querySelector('#facilityProtocolName').addEventListener('change',event=>{
+      const selectedName=event.target.value.trim();
+      if(!selectedName)return;
+      const saved=[...facilityProtocols].reverse().find(protocol=>protocol.name.trim()===selectedName);
+      if(saved)editFacilityProtocol(saved.id);
+    });
     facilityForm.addEventListener('submit',event=>{
       event.preventDefault();
       const name=document.querySelector('#facilityProtocolName').value.trim(),regionName=document.querySelector('#facilityProtocolRegion').value.trim();
