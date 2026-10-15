@@ -74,6 +74,38 @@
                 <details class="facility-settings" id="facilitySettings" open>
           <summary>登録・編集フォームを表示</summary>
           <p class="hint">施設で承認済みの手順だけ登録してください。依頼文または選択済みGemini用語と登録語が一致すると候補に表示します。プロトコル名・部位・各相・照合語はこのブラウザに保存し、Geminiへは送信しません。</p>
+          <section class="facility-scan" aria-labelledby="facilityScanTitle">
+            <h3 id="facilityScanTitle">依頼書を撮影して登録用語を作成</h3>
+            <p class="hint">カメラ撮影または写真選択 → Gemini文字起こし → 原文確認 → Gemini用語案を確認、の順で進みます。選んだ用語は登録フォームに追加されますが、自動保存はされません。</p>
+            <div class="scan-actions">
+              <button class="primary" id="facilityStartCamera" type="button">📷 カメラを起動</button>
+              <button class="secondary" id="facilityChooseImage" type="button">写真を選ぶ</button>
+              <input id="facilityImageFile" type="file" accept="image/*" hidden>
+            </div>
+            <section class="scan-panel hidden" id="facilityCameraPanel" aria-label="施設用語登録の依頼書カメラ">
+              <video id="facilityCameraVideo" autoplay playsinline muted></video>
+              <div class="scan-actions">
+                <button class="primary" id="facilityTakePhoto" type="button">撮影して文字起こし</button>
+                <button class="secondary" id="facilityStopCamera" type="button">カメラを閉じる</button>
+              </div>
+            </section>
+            <p class="scan-status" id="facilityScanStatus" role="status" aria-live="polite"></p>
+            <section class="scan-panel hidden" id="facilityOcrReview" aria-label="文字起こし結果の確認">
+              <label class="field-label" for="facilityOcrText">Geminiの文字起こし結果（確認・修正）</label>
+              <textarea id="facilityOcrText" rows="6" maxlength="4000" placeholder="読み取った文章を確認・修正してください"></textarea>
+              <div class="scan-actions"><button class="primary" id="facilityExtractTerms" type="button">Geminiで登録用語を抽出</button></div>
+            </section>
+            <section class="ai-review hidden" id="facilityTermReview" aria-live="polite">
+              <h4>登録用語の候補</h4>
+              <p class="scan-note">AIが原文から抽出・整理した候補です。必要なものだけ選択してください。症状から病名や検査方法を推測しません。</p>
+              <div id="facilityTermOptions"></div>
+              <div class="scan-actions">
+                <button class="primary" id="facilityAddTerms" type="button">選択した用語を登録フォームに追加</button>
+                <button class="secondary" id="facilityDiscardTerms" type="button">候補を破棄</button>
+              </div>
+            </section>
+            <p class="scan-note">画像は文字起こしのためGeminiへ送信され、確認後の文章も用語抽出のためGeminiへ送信されます。患者氏名・IDなどを含む実患者情報は入力・送信しないでください。架空・匿名化した画像、または施設で承認された画像を使用し、文字起こしを原文と照合してください。</p>
+          </section>
           <form id="facilityProtocolForm">
             <label for="facilityProtocolName">プロトコル名</label><input id="facilityProtocolName" required maxlength="100" placeholder="例：腹部造影CT（施設標準）">
             <div class="form-grid">
@@ -6330,6 +6362,77 @@
     });
     document.querySelector('#cancelFacilityEdit').addEventListener('click',()=>{resetFacilityForm();document.querySelector('#facilitySaveStatus').textContent='入力をクリアしました。'});
     renderFacilityProtocols();
+    const facilityCameraPanel=document.querySelector('#facilityCameraPanel'), facilityCameraVideo=document.querySelector('#facilityCameraVideo');
+    const facilityOcrReview=document.querySelector('#facilityOcrReview'), facilityOcrText=document.querySelector('#facilityOcrText');
+    const facilityTermReview=document.querySelector('#facilityTermReview'), facilityTermOptions=document.querySelector('#facilityTermOptions');
+    let facilityCameraStream=null, facilityExtractedTerms=[];
+    function setFacilityScanStatus(message,isError=false){const status=document.querySelector('#facilityScanStatus');status.textContent=message;status.classList.toggle('error',isError)}
+    function stopFacilityCamera(){if(facilityCameraStream){facilityCameraStream.getTracks().forEach(track=>track.stop());facilityCameraStream=null}facilityCameraVideo.srcObject=null;facilityCameraPanel.classList.add('hidden')}
+    document.querySelector('#facilityStartCamera').addEventListener('click',async()=>{
+      if(!navigator.mediaDevices?.getUserMedia){setFacilityScanStatus('このブラウザではカメラを使えません。写真を選択してください。',true);return}
+      try{stopFacilityCamera();facilityCameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});facilityCameraVideo.srcObject=facilityCameraStream;facilityCameraPanel.classList.remove('hidden');setFacilityScanStatus('依頼文が明るく、まっすぐ映るようにしてください。')}
+      catch(error){setFacilityScanStatus(error.name==='NotAllowedError'?'カメラの使用が許可されませんでした。ブラウザの設定を確認してください。':'カメラを開始できませんでした。写真を選択してください。',true)}
+    });
+    document.querySelector('#facilityStopCamera').addEventListener('click',()=>{stopFacilityCamera();setFacilityScanStatus('カメラを閉じました。')});
+    document.querySelector('#facilityTakePhoto').addEventListener('click',()=>{
+      if(!facilityCameraVideo.videoWidth){setFacilityScanStatus('カメラ映像の準備中です。少し待ってからもう一度押してください。',true);return}
+      const canvas=document.createElement('canvas');canvas.width=facilityCameraVideo.videoWidth;canvas.height=facilityCameraVideo.videoHeight;canvas.getContext('2d').drawImage(facilityCameraVideo,0,0);stopFacilityCamera();
+      canvas.toBlob(blob=>{if(blob)transcribeFacilityImage(blob);else setFacilityScanStatus('撮影画像を作成できませんでした。',true)},'image/jpeg',.92);
+    });
+    document.querySelector('#facilityChooseImage').addEventListener('click',()=>document.querySelector('#facilityImageFile').click());
+    document.querySelector('#facilityImageFile').addEventListener('change',event=>{
+      const file=event.target.files?.[0];event.target.value='';if(!file)return;
+      if(!file.type.startsWith('image/')){setFacilityScanStatus('画像ファイルを選択してください。',true);return}
+      if(file.size>15*1024*1024){setFacilityScanStatus('画像は15 MB以下のものを選択してください。',true);return}
+      transcribeFacilityImage(file);
+    });
+    async function transcribeFacilityImage(image){
+      const endpoint=aiEndpoint.value.trim();
+      if(!endpoint){setFacilityScanStatus('先にAI Worker URLを保存してください。',true);document.querySelector('.ai-settings').open=true;aiEndpoint.focus();return}
+      let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setFacilityScanStatus('Worker URLの形式を確認してください。',true);return}
+      if(!confirm('画像をCloudflare Worker経由でGoogle Geminiへ送信して文字起こしします。氏名・IDなどの実患者情報を含む依頼書は送信しないでください。架空・匿名化した画像、または施設で承認された画像ですか？'))return;
+      document.querySelector('#facilityExtractTerms').disabled=true;facilityOcrReview.classList.add('hidden');facilityTermReview.classList.add('hidden');setFacilityScanStatus('Geminiで文字起こししています…');
+      try{
+        const imageBase64=await compressImageForGemini(image);
+        const response=await fetch(parsed.href.replace(/\/$/,'')+'/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageBase64,mimeType:'image/jpeg'})});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）`);
+        if(typeof payload.text!=='string'||!payload.text.trim())throw new Error('Geminiから文字起こし結果が返りませんでした。');
+        facilityOcrText.value=payload.text.trim();facilityOcrReview.classList.remove('hidden');setFacilityScanStatus('文字起こし案を原文と照合し、必要なら修正してください。用語抽出はまだ行っていません。');
+      }catch(error){setFacilityScanStatus(error.message||'文字起こしに失敗しました。Worker設定を確認してください。',true)}
+    }
+    document.querySelector('#facilityExtractTerms').addEventListener('click',async()=>{
+      const text=facilityOcrText.value.trim(),endpoint=aiEndpoint.value.trim();
+      if(!text){setFacilityScanStatus('先に文字起こし結果を確認してください。',true);facilityOcrText.focus();return}
+      if(text.length>4000){setFacilityScanStatus('文章は4000文字以内にしてください。',true);return}
+      let parsed;try{parsed=new URL(endpoint);if(!['https:','http:'].includes(parsed.protocol))throw new Error()}catch{setFacilityScanStatus('AI Worker URLの形式を確認してください。',true);return}
+      if(!confirm('確認した文字起こし文章をGoogle Geminiへ送信し、登録用語案を作成します。患者氏名・IDなどの個人情報が含まれていないことを確認してください。続けますか？'))return;
+      const button=document.querySelector('#facilityExtractTerms');button.disabled=true;facilityTermReview.classList.add('hidden');setFacilityScanStatus('Geminiで登録用語案を作成しています…');
+      try{
+        const response=await fetch(parsed.href.replace(/\/$/,'')+'/normalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(payload.error||`AI Workerの応答エラー（${response.status}）`);
+        const inputNormalized=normalizedText(text);
+        facilityExtractedTerms=[...new Map((Array.isArray(payload.matches)?payload.matches:[])
+          .filter(item=>item&&typeof item.sourcePhrase==='string'&&typeof item.canonicalTerm==='string'&&item.canonicalTerm.trim().length>0&&item.canonicalTerm.trim().length<=80&&inputNormalized.includes(normalizedText(item.sourcePhrase)))
+          .map(item=>[`${item.sourcePhrase}\u0000${item.canonicalTerm}`,{sourcePhrase:item.sourcePhrase,canonicalTerm:item.canonicalTerm.trim()}])).values()];
+        facilityTermOptions.replaceChildren();
+        if(!facilityExtractedTerms.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='用語候補が見つかりませんでした。原文を確認し、下の登録フォームへ手入力してください。';facilityTermOptions.append(empty)}
+        facilityExtractedTerms.forEach((item,index)=>{const label=document.createElement('label');label.className='ai-option';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=String(index);checkbox.checked=true;const content=document.createElement('span');content.append(document.createTextNode(item.sourcePhrase===item.canonicalTerm?item.canonicalTerm:`${item.sourcePhrase} → ${item.canonicalTerm}`));const detail=document.createElement('small');detail.textContent='原文にある表現からの登録用語案';content.append(detail);label.append(checkbox,content);facilityTermOptions.append(label)});
+        facilityTermReview.classList.remove('hidden');setFacilityScanStatus('用語案を確認し、登録する語だけ選択してください。プロトコルはまだ保存されていません。');
+      }catch(error){setFacilityScanStatus(error.message||'用語抽出に失敗しました。Worker設定を確認してください。',true)}
+      finally{button.disabled=false}
+    });
+    document.querySelector('#facilityAddTerms').addEventListener('click',()=>{
+      const selected=[...facilityTermOptions.querySelectorAll('input[type="checkbox"]:checked')].map(input=>facilityExtractedTerms[Number(input.value)]).filter(Boolean);
+      if(!selected.length){setFacilityScanStatus('登録する用語を1つ以上選択してください。',true);return}
+      const existing=facilityForm.querySelector('#facilityProtocolTerms').value.split(/[\\n,、，]/).map(term=>term.trim()).filter(Boolean);
+      const merged=[...new Set([...existing,...selected.flatMap(item=>[item.sourcePhrase,item.canonicalTerm])])];
+      facilityForm.querySelector('#facilityProtocolTerms').value=merged.join('\\n');
+      facilityTermReview.classList.add('hidden');facilityForm.querySelector('#facilityProtocolTerms').focus();setFacilityScanStatus(`${selected.length}件の用語案をフォームに追加しました。プロトコル名・部位などを確認して保存してください。`);
+    });
+    document.querySelector('#facilityDiscardTerms').addEventListener('click',()=>{facilityExtractedTerms=[];facilityTermReview.classList.add('hidden');setFacilityScanStatus('用語案を破棄しました。')});
+    document.querySelector('#facilityProtocolForm').addEventListener('submit',()=>stopFacilityCamera());
     function analyzeIfReady(){if(request.value.trim())analyze()}
     function renderAiSuggestions(items){
       aiOptions.replaceChildren();
