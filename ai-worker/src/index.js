@@ -139,7 +139,8 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
     const url = new URL(request.url);
-    if (request.method === 'POST' && url.pathname === '/transcribe') {
+    const protocolTranscription = url.pathname === '/transcribe-protocol';
+    if (request.method === 'POST' && ['/transcribe', '/transcribe-protocol'].includes(url.pathname)) {
       if (!request.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
         return json({ error: 'Content-Typeはapplication/jsonにしてください。' }, 415, origin);
       }
@@ -168,9 +169,13 @@ export default {
             method: 'POST',
             headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              systemInstruction: { parts: [{ text: '画像内の依頼文を見たとおりに文字起こししてください。日本語の表記を勝手に修正・補完・要約・翻訳しないでください。改行と箇条書きは可能な範囲で保持してください。読めない箇所は[判読不能]と書いてください。診断、病名の推測、検査プロトコルの提案は行わず、依頼文以外の画面表示や個人識別情報は出力しないでください。' }] },
-              contents: [{ role: 'user', parts: [{ text: 'この画像の依頼文部分だけを、見える範囲で忠実に文字起こししてください。' }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],
-              generationConfig: { temperature: 0, maxOutputTokens: 2000 },
+              systemInstruction: { parts: [{ text: protocolTranscription
+                ? 'MRI検査プロトコル資料の画像から、見える文字と表を忠実に文字起こししてください。部位名、シーケンス名（例：T1Ax、T2Sag）、撮像条件、注記を読み取れる範囲で行ごとに保持してください。表の行列関係は「項目：内容」の形で示し、推測・補完・要約・翻訳をしないでください。読めない箇所は[判読不能]としてください。診断や新しい撮像条件の提案はしないでください。'
+                : '画像内の依頼文を見たとおりに文字起こししてください。日本語の表記を勝手に修正・補完・要約・翻訳しないでください。改行と箇条書きは可能な範囲で保持してください。読めない箇所は[判読不能]と書いてください。診断、病名の推測、検査プロトコルの提案は行わず、依頼文以外の画面表示や個人識別情報は出力しないでください。' }] },
+              contents: [{ role: 'user', parts: [{ text: protocolTranscription
+                ? 'このMRIプロトコル資料の画像に書かれた情報だけを文字起こししてください。'
+                : 'この画像の依頼文部分だけを、見える範囲で忠実に文字起こししてください。' }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],
+              generationConfig: { temperature: 0, maxOutputTokens: protocolTranscription ? 4000 : 2000 },
             }),
           });
           if (![502, 503, 504].includes(upstream.status) || attempt === 2) break;
@@ -192,14 +197,14 @@ export default {
       try {
         const outputText = extractOutputText(await upstream.json()).trim();
         if (!outputText) throw new Error('No transcription text');
-        return json({ text: outputText.slice(0, 8000) }, 200, origin);
+        return json({ text: outputText.slice(0, protocolTranscription ? 12000 : 8000) }, 200, origin);
       } catch {
         return json({ error: 'Geminiの文字起こし結果を読み取れませんでした。もう一度お試しください。' }, 502, origin);
       }
     }
     const extractionMode = url.pathname === '/extract-terms';
     if (request.method !== 'POST' || (!extractionMode && url.pathname !== '/normalize')) {
-      return json({ error: 'このURLではPOST /normalizeまたはPOST /extract-termsのみ利用できます。' }, 404, origin);
+      return json({ error: 'このURLではPOST /transcribe、/transcribe-protocol、/normalizeまたは/extract-termsのみ利用できます。' }, 404, origin);
     }
     if (!request.headers.get('Content-Type')?.toLowerCase().includes('application/json')) {
       return json({ error: 'Content-Typeはapplication/jsonにしてください。' }, 415, origin);
