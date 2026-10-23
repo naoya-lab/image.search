@@ -1,4 +1,4 @@
-const CACHE_NAME = 'imaging-assist-pages-v2';
+const CACHE_NAME = 'imaging-assist-pages-v3';
 const CACHE_PREFIX = 'imaging-assist-pages-';
 
 self.addEventListener('install', (event) => {
