@@ -21,9 +21,10 @@
 <article class="card"><h2>依頼内容</h2><p class="sub">入力内容は通常この端末内で処理されます。</p>
 <div class="row"><div><label class="label" for="region">撮影部位</label><select id="region"><option value="">依頼文から検索</option><option>頭部</option><option>頭頸部</option><option>胸部</option><option>心臓</option><option>腹部</option><option>小腸</option><option>全脊椎</option><option>脊椎</option><option>肩関節</option><option>肘関節</option><option>手関節・手指</option><option>四肢・軟部組織</option><option>下肢全長</option><option>全身</option><option>骨盤</option><option>股関節</option><option>膝関節</option><option>足関節・足部</option><option>骨盤内臓器</option><option>乳房</option><option>その他</option></select></div><div><label class="label" for="request">依頼文</label><span class="micro">症状・疑い病名・検査目的など</span></div></div>
 <textarea id="request" placeholder="例：腰痛、右下肢のしびれ。腰椎椎間板ヘルニア疑い。"></textarea>
-<div class="actions"><button class="primary" id="searchBtn">登録プロトコルを検索</button><button class="secondary" id="cameraBtn">📷 カメラを起動</button><button class="secondary" id="clearBtn">クリア</button></div>
+<div class="actions"><button class="primary" id="searchBtn">登録プロトコルを検索</button><button class="secondary" id="cameraBtn">📷 アプリ内カメラを起動</button><button class="secondary" id="clearBtn">クリア</button></div>
 <section class="camera-panel hidden" id="requestCameraPanel" aria-label="依頼文の撮影">
 <video id="requestCameraVideo" autoplay playsinline muted></video>
+<p class="micro">iPhone標準カメラは開かず、この画面内に映像を表示して撮影します。</p>
 <div class="actions"><button class="primary" id="takeRequestPhoto" type="button">カメラで依頼文を撮影</button><button class="secondary" id="chooseRequestPhoto" type="button">写真を選んでGeminiで文字起こし</button><button class="secondary" id="stopRequestCamera" type="button">カメラを閉じる</button><input id="imageInput" type="file" accept="image/*" hidden></div>
 </section>
 <section class="camera-panel hidden" id="requestOcrReview" aria-label="Gemini文字起こし結果の確認"><label class="label" for="requestOcrText">Geminiの文字起こし結果を確認・修正</label><textarea id="requestOcrText" rows="6" placeholder="読み取った文章を確認・修正してください"></textarea><div class="actions"><button class="primary" id="applyRequestOcr" type="button">確認した文字起こしを依頼文へ反映</button><button class="secondary" id="discardRequestOcr" type="button">文字起こし結果を破棄</button></div></section>
