@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>放射線技師AI | 試験版</title>
+<style>
+:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",sans-serif;background:#f2f6fa;color:#12253b}
+*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:0 auto;padding:24px 16px 70px}
+header{padding:20px 0}h1{font-size:1.65rem;margin:0 0 7px}h2{font-size:1.12rem;margin:0 0 15px}
+p{line-height:1.7}.muted{color:#536678;font-size:.9rem}.panel{background:#fff;border:1px solid #dae3ed;border-radius:16px;padding:20px;margin:16px 0}
+label{display:block;font-weight:650;margin:14px 0 6px}input,select,textarea{width:100%;padding:12px;border:1px solid #abb9c9;border-radius:9px;font:inherit;background:white;color:#12253b}
+textarea{min-height:150px;resize:vertical}button{border:0;background:#145997;color:white;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
+.warning{border-left:4px solid #af6c10;padding:12px;background:#fff8e9}.reply{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} .hide{display:none}
+</style></head><body><main>
+<header><h1>放射線技師AI <small style="font-size:.65em">MVP</small></h1><p class="muted">撮影技術・画像物理・プロトコル検討を支援する試験版</p></header>
+<section class="warning" role="note"><strong>教育・研究用／臨床判断の代替には使用できません。</strong><br>
+患者氏名、患者ID、生年月日、検査画像、その他個人情報は入力しないでください。救急対応や検査可否などは施設の専門職が判断してください。</section>
+<section class="panel"><h2>専門AIに質問</h2>
+<form id="ask">
+<label for="category">専門分野</label><select id="category"><option>CT・CTA</option><option>MRI</option><option>一般撮影</option><option>透視</option><option>マンモグラフィ</option><option>画像物理・品質管理</option></select>
+<label for="question">質問（匿名化した一般的な内容のみ）</label>
+<textarea id="question" maxlength="3000" required placeholder="例：頭部CTAで造影タイミングが早すぎる場合に検討すべき原因は？"></textarea>
+<label for="endpoint">APIのURL（管理者が設定）</label>
+<input id="endpoint" type="url" placeholder="https://your-worker.example.workers.dev/api/ask" autocomplete="off">
+<p class="muted">API URLはこの画面内でのみ使用し、端末に保存しません。未設定の場合は質問を送信しません。</p>
+<button id="submit" type="submit">回答を生成</button> <button type="button" id="clear" style="background:#60758a">消去</button>
+<p id="status" role="status" aria-live="polite"></p></form></section>
+<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="reply" class="reply"></div></section>
+<section class="panel"><h2>参考にする公的な情報源</h2><p class="muted">以下は情報源の入口です。AIの個別回答に対する出典の自動照合は初期版では未実装です。</p>
+<ul><li><a href="https://www.mhlw.go.jp/" target="_blank" rel="noopener noreferrer">厚生労働省</a></li>
+<li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
+<li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
+<li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
+<footer>試験版 v0.1 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+</main><script>
+"use strict";
+const form=document.querySelector("#ask"),status=document.querySelector("#status"),reply=document.querySelector("#reply"),result=document.querySelector("#result"),submit=document.querySelector("#submit");
+document.querySelector("#clear").addEventListener("click",()=>{document.querySelector("#question").value="";reply.textContent="";result.classList.add("hide");status.textContent=""});
+form.addEventListener("submit",async(e)=>{
+ e.preventDefault();const question=document.querySelector("#question").value.trim();
+ const endpoint=document.querySelector("#endpoint").value.trim();
+ if(!endpoint){status.textContent="管理者が用意したAPI URLを入力してください。";return}
+ let url;try{url=new URL(endpoint);if(url.protocol!=="https:")throw Error()}catch{status.textContent="HTTPSのAPI URLを指定してください。";return}
+ if(!question){return}if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\s*[:：]/i.test(question)){status.textContent="個人情報の可能性があります。匿名化してから質問してください。";return}
+ submit.disabled=true;status.textContent="回答を生成中…";result.classList.add("hide");
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),30000);
+ try{const response=await fetch(url.href,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({category:document.querySelector("#category").value,question}),signal:controller.signal});
+ const data=await response.json();if(!response.ok)throw Error(data.error||"APIエラー");
+ reply.textContent=data.answer||"回答がありません";result.classList.remove("hide");status.textContent="回答しました。根拠と施設基準を確認してください。";
+ }catch(err){status.textContent="通信に失敗しました: "+(err.name==="AbortError"?"タイムアウト":err.message)}
+ finally{clearTimeout(timer);submit.disabled=false}
+});
+</script></body></html>
