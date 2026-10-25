@@ -1,7 +1,7 @@
 /**
  * Radiographer AI MVP — Cloudflare Worker
- * Required secrets/config: OPENAI_API_KEY (secret), ALLOWED_ORIGIN, AI_MODEL.
- * IMPORTANT: Require Cloudflare Access / WAF rate limiting before public exposure.
+ * Required secrets/config: OPENAI_API_KEY (secret), PERSONAL_ACCESS_TOKEN (secret), ALLOWED_ORIGIN, AI_MODEL.
+ * IMPORTANT: Personal token authentication is minimum protection. Add WAF rate limiting before exposure.
  * No request content is intentionally persisted.
  */
 const CATEGORIES = new Set(["CT・CTA","MRI","一般撮影","透視","マンモグラフィ","画像物理・品質管理"]);
@@ -17,9 +17,15 @@ function json(body,status,origin){return new Response(JSON.stringify(body),{stat
 export default {async fetch(request,env){
  const origin=request.headers.get("Origin")||"";
  if(!env.ALLOWED_ORIGIN||origin!==env.ALLOWED_ORIGIN)return json({error:"許可されていないアクセスです"},403,"null");
- if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type","Access-Control-Max-Age":"600","Vary":"Origin"}});
+ if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Allow-Headers":"Content-Type, X-Access-Token","Access-Control-Max-Age":"600","Vary":"Origin"}});
  if(request.method!=="POST"||new URL(request.url).pathname!=="/api/ask")return json({error:"Not found"},404,origin);
- if(!env.OPENAI_API_KEY||!env.AI_MODEL)return json({error:"AIバックエンドが設定されていません"},503,origin);
+ if(!env.OPENAI_API_KEY||!env.PERSONAL_ACCESS_TOKEN||!env.AI_MODEL)return json({error:"AIバックエンドが設定されていません"},503,origin);
+ const token=request.headers.get("X-Access-Token")||"";
+ // Compare SHA-256 digests (fixed-length) without exposing expected token.
+ const digest=async s=>new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)));
+ const [actual,expected]=await Promise.all([digest(token),digest(env.PERSONAL_ACCESS_TOKEN)]);
+ let diff=0;for(let i=0;i<expected.length;i++)diff|=actual[i]^expected[i];
+ if(!token||diff!==0)return json({error:"アクセスキーが正しくありません"},401,origin);
  if(Number(request.headers.get("content-length")||0)>15000)return json({error:"入力が長すぎます"},413,origin);
  let payload;try{payload=await request.json()}catch{return json({error:"JSON形式で入力してください"},400,origin)}
  const {question,category}=payload||{};
