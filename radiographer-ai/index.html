@@ -45,7 +45,7 @@ form.addEventListener("submit",async e=>{
  if(!question){status.textContent="質問を入力してください。";return;}
  if(!token){status.textContent="個人用アクセスキーを入力してください。";return;}
  if(question.length>3000){status.textContent="質問は3000文字以内にしてください。";return;}
- if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\\s*[:：]/i.test(question)){status.textContent="個人情報の可能性があります。匿名化してください。";return;}
+ if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\s*[:：]/i.test(question)){status.textContent="個人情報の可能性があります。匿名化してください。";return;}
  pending=true;submit.disabled=true;status.textContent="回答を生成中…";result.classList.add("hide");
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
  try{
