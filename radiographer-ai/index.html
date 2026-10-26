@@ -22,13 +22,13 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <label for="accessToken">個人用アクセスキー（管理者が設定）</label><input id="accessToken" type="password" autocomplete="off" placeholder="CloudflareにSecretとして登録したアクセスキー"><p class="muted">このキーは端末に保存しません。GitHubや会話に貼り付けないでください。</p><p class="muted">接続先は放射線技師AI専用のCloudflare Workerに固定されています。アクセスキーは端末へ永続保存しません。</p>
 <label style="font-weight:normal"><input id="searchGuidelines" type="checkbox" checked style="width:auto"> 該当する公式ガイドラインの一部を確認する（CT被ばく・MRI安全性の試験機能）</label><label style="font-weight:normal"><input id="searchPubmed" type="checkbox" checked style="width:auto"> PubMedで関連論文の書誌情報を検索する</label><button id="submit" type="submit">回答を生成</button> <button type="button" id="clear" style="background:#60758a">消去</button><p class="muted">送信した質問は外部AIサービスで処理されます。匿名化は自動的には保証されません。</p>
 <p id="status" role="status" aria-live="polite"></p></form></section>
-<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="reply" class="reply"></div><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">AIの回答に実在する文献名・URLがあっても未検証の場合があります。下の公的資料で確認してください。</p></section>
+<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="reply" class="reply"></div><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p><ul id="guidelineEvidenceList"></ul></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">AIの回答に実在する文献名・URLがあっても未検証の場合があります。下の公的資料で確認してください。</p></section>
 <section class="panel"><h2>参考にする公的な情報源</h2><p class="muted">以下は情報源の入口です。AIの個別回答に対する出典の自動照合は初期版では未実装です。</p>
 <ul><li><a href="https://www.mhlw.go.jp/" target="_blank" rel="noopener noreferrer">厚生労働省</a></li>
 <li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
 <li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
 <li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
-<footer>試験版 v0.7 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+<footer>試験版 v0.8 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
 </main><script>
 "use strict";
 const $=id=>document.getElementById(id);
@@ -36,7 +36,7 @@ const form=$("ask"),status=$("status"),reply=$("reply"),result=$("result"),submi
 const API="https://radiographer-ai-api.zshijintian.workers.dev/api/ask";
 let pending=false;
 $("examples").addEventListener("change",()=>{if($("examples").value)$("question").value=$("examples").value;});
-$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
+$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineEvidenceList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
 $("copyAnswer").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(reply.textContent);status.textContent="回答をコピーしました。";}catch{status.textContent="コピーできませんでした。回答文を選択してコピーしてください。";}});
 form.addEventListener("submit",async e=>{
  e.preventDefault();
@@ -77,6 +77,15 @@ form.addEventListener("submit",async e=>{
   }
   const ev={partial_excerpt:"公式ページの一部分を取得してAIに提供（全文・回答との一致は未検証）",no_match_or_unavailable:"該当箇所を確認できませんでした（公式リンクのみ）",unavailable:"公式ページの取得に失敗（公式リンクのみ）",not_found:"未検索"};
   $("guidelineEvidenceStatus").textContent=ev[data.guidelineEvidenceStatus]||"取得状況不明";
+  $("guidelineEvidenceList").replaceChildren();
+  for(const e of (Array.isArray(data.guidelineEvidence)?data.guidelineEvidence:[])){
+   const item=document.createElement("li"),heading=document.createElement("strong"),detail=document.createElement("p");
+   heading.textContent="取得した短い抜粋："+(e.title||e.id||"公式資料");
+   detail.textContent=e.excerpt||"";
+   item.append(heading,detail);
+   if(e.modified){const small=document.createElement("small");small.textContent="ページ更新日時（サイト掲載値）: "+e.modified;item.append(small);}
+   $("guidelineEvidenceList").append(item);
+  }
   $("guidelineSources").classList.toggle("hide",!$("guidelineList").children.length);
   result.classList.remove("hide");result.scrollIntoView({behavior:"smooth",block:"nearest"});
   status.textContent="回答しました。内容と根拠を検証してください。";
