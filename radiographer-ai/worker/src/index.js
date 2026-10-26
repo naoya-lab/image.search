@@ -26,6 +26,12 @@ export default {async fetch(request,env){
  const [actual,expected]=await Promise.all([digest(token),digest(env.PERSONAL_ACCESS_TOKEN)]);
  let diff=0;for(let i=0;i<expected.length;i++)diff|=actual[i]^expected[i];
  if(!token||diff!==0)return json({error:"アクセスキーが正しくありません"},401,origin);
+ // Limit authenticated requests before sending anything to the paid AI API.
+ if(!env.AI_RATE_LIMITER || typeof env.AI_RATE_LIMITER.limit!=="function")return json({error:"利用回数制限が未設定です"},503,origin);
+ let quota;
+ try { quota=await env.AI_RATE_LIMITER.limit({key:"personal-ai"}); }
+ catch { return json({error:"利用回数制限を確認できません"},503,origin); }
+ if(!quota.success)return json({error:"短時間の利用回数が上限に達しました。1分ほど後に再試行してください"},429,origin);
  if(Number(request.headers.get("content-length")||0)>15000)return json({error:"入力が長すぎます"},413,origin);
  let payload;try{payload=await request.json()}catch{return json({error:"JSON形式で入力してください"},400,origin)}
  const {question,category}=payload||{};
