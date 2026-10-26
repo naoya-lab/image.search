@@ -36,7 +36,8 @@ document.querySelector("#clear").addEventListener("click",()=>{document.querySel
 form.addEventListener("submit",async(e)=>{
  e.preventDefault();const question=document.querySelector("#question").value.trim();
  const endpoint="https://radiographer-ai-api.zshijintian.workers.dev/api/ask";
- const accessToken=document.querySelector("#accessToken").value.trim();if(!accessToken){status.textContent="個人用アクセスキーを入力してください。";return}\n // Endpoint is pinned to the dedicated Worker to avoid credential exfiltration.
+ const accessToken=document.querySelector("#accessToken").value.trim();if(!accessToken){status.textContent="個人用アクセスキーを入力してください。";return}
+ // Endpoint is pinned to the dedicated Worker to avoid credential exfiltration.
  let url;try{url=new URL(endpoint);if(url.protocol!=="https:")throw Error()}catch{status.textContent="HTTPSのAPI URLを指定してください。";return}
  if(!question){return}if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\s*[:：]/i.test(question)){status.textContent="個人情報の可能性があります。匿名化してから質問してください。";return}
  submit.disabled=true;status.textContent="回答を生成中…";result.classList.add("hide");
