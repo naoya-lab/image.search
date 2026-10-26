@@ -58,10 +58,31 @@ async function fetchPubmedAbstracts(papers){
   return {pmid:id,abstract:abs.slice(0,1700)};
  }).filter(x=>x.pmid&&x.abstract&&ids.includes(x.pmid));
 }
+// Live excerpt lookup is limited to approved fixed JRS URLs, no crawling/indexing/storage.
+// Excerpts are bounded; guidance must be checked on publisher website for clinical use.
+const LIVE_GUIDELINE_PAGES=[
+ {id:"jrsdose",url:"https://jrs-gl.radiology.jp/general/3355/",match:/被ばく|線量|CTDI|DLP|放射線|dose/i,areas:["CT・CTA","一般撮影","画像物理・品質管理"]},
+ {id:"jrsMRI",url:"https://jrs-gl.radiology.jp/general/2749/",match:/MRI|磁場|SAR|RF|安全|インプラント|造影/i,areas:["MRI"]}
+];
+async function guidelineExcerpts(category,question){
+ const selected=LIVE_GUIDELINE_PAGES.filter(p=>p.areas.includes(category)&&p.match.test(question)).slice(0,1);
+ const found=[];
+ for(const p of selected){
+  const response=await fetch(p.url,{signal:AbortSignal.timeout(5500),redirect:"error",headers:{"Accept":"text/html"}});
+  if(!response.ok||!(response.headers.get("content-type")||"").includes("text/html"))continue;
+  let text="";
+  const collector={text(chunk){if(text.length<2200)text+=chunk.text;},element(){}};
+  // Collect article body only; navigation and scripts must not become evidence.
+  await new HTMLRewriter().on("article",collector).on("main article",collector).transform(response).text();
+  const cleaned=text.replace(/\s+/g," ").trim();
+  if(cleaned.length>=90)found.push({id:p.id,url:p.url,excerpt:cleaned.slice(0,350),scope:"partial_live_excerpt"});
+ }
+ return found;
+}
 const SYSTEM = `あなたは診療放射線技師の教育・研究向け技術アシスタント。日本語で回答する。
 臨床判断・装置操作・診断の最終決定は担当の有資格者が行う。実際の患者の診断や緊急対応は断定しない。
 病態と検査目的、一般的選択肢、メリット・デメリット、安全上の注意、確認すべき情報を整理する。
-PubMedの書誌情報と公式ガイドラインの案内URLが追加される場合がある。ガイドライン本文は自動取得していないため、これらを読んだ・確認したと主張しない。PubMed抄録が提供された場合のみ抄録に基づく慎重な要約を許可し、抄録にない結果を推測しない。出典のPMIDを示す。これはタイトル・識別子の実在確認であり、本文内容や結論の裏付けではない。文献の内容を読んでいない場合は結果を推測しない。論文名、DOI、ガイドラインの章節などを捏造しない。
+PubMedの書誌情報と公式ガイドラインの案内URLが追加される場合がある。ガイドライン本文は自動取得していないため、これらを読んだ・確認したと主張しない。PubMed抄録が提供された場合のみ抄録に基づく慎重な要約を許可し、抄録にない結果を推測しない。公式ガイドラインの限定的な実取得抜粋が付与された場合は、その抜粋に明示されたことだけを根拠として扱い、全文確認済みとは言わない。出典のPMIDを示す。これはタイトル・識別子の実在確認であり、本文内容や結論の裏付けではない。文献の内容を読んでいない場合は結果を推測しない。論文名、DOI、ガイドラインの章節などを捏造しない。
 特定の根拠を検証できない場合は「出典未検証」と明記し、公式資料での確認を促す。
 医学的に不確実な点や装置固有の相違を明確にする。放射線照射・造影剤投与の具体的条件は患者個別に確定しない。
 個人を特定できる情報が提示されたら、詳細を繰り返さず匿名化を依頼する。
@@ -91,14 +112,16 @@ export default {async fetch(request,env){
  if(typeof question!=="string"||question.trim().length<3||question.length>3000||!CATEGORIES.has(category))return json({error:"入力内容を確認してください"},400,origin);
  if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\s*[:：]/i.test(question))return json({error:"個人情報は入力しないでください"},400,origin);
  try{
+ let guidelineEvidence=[],guidelineEvidenceStatus="not_found";
+ if(payload?.searchGuidelines===true){try{guidelineEvidence=await guidelineExcerpts(category,question);guidelineEvidenceStatus=guidelineEvidence.length?"partial_excerpt":"no_match_or_unavailable";}catch{guidelineEvidenceStatus="unavailable";}}
  const guidelines=GUIDELINES.filter(g=>g.areas.includes(category)).map(({id,title,url})=>({id,title,url,verification:"publisher_link_only"}));
  let sources=[],abstracts=[],literatureStatus="not_requested";
  if(payload?.searchPubmed===true){try{sources=await pubmedSearch(category,question);literatureStatus=sources.length?"metadata_only":"no_results"; if(sources.length){try{abstracts=await fetchPubmedAbstracts(sources);if(abstracts.length)literatureStatus="abstracts_retrieved";}catch{/* metadata remains available */}}}catch{literatureStatus="unavailable";}}
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
- let upstream;try{upstream=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+env.OPENAI_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:env.AI_MODEL,store:false,temperature:0.2,max_tokens:1300,messages:[{role:"system",content:SYSTEM},{role:"user",content:"専門分野: "+category+"\n質問: "+question+"\nPubMed書誌データ（存在確認のみ。本文未検証）: "+JSON.stringify(sources)+"\nPubMedで取得した抄録（最大3件、本文ではない。各PMIDで照合）: "+JSON.stringify(abstracts)+"\n公式ガイドラインの案内リンク（本文未取得・未照合。内容を引用しない）: "+JSON.stringify(guidelines)}]}),signal:controller.signal})}finally{clearTimeout(timer)}
+ let upstream;try{upstream=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{"Authorization":"Bearer "+env.OPENAI_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:env.AI_MODEL,store:false,temperature:0.2,max_tokens:1300,messages:[{role:"system",content:SYSTEM},{role:"user",content:"専門分野: "+category+"\n質問: "+question+"\nPubMed書誌データ（存在確認のみ。本文未検証）: "+JSON.stringify(sources)+"\nPubMedで取得した抄録（最大3件、本文ではない。各PMIDで照合）: "+JSON.stringify(abstracts)+"\n公式ガイドラインの案内リンク（本文未取得・未照合。内容を引用しない）: "+JSON.stringify(guidelines)+"\n公式ガイドラインから今回取得した限定的抜粋（全文確認ではない）: "+JSON.stringify(guidelineEvidence)}]}),signal:controller.signal})}finally{clearTimeout(timer)}
  if(!upstream.ok)return json({error:"AIサービスの応答に問題がありました"},502,origin);
  const data=await upstream.json();const answer=data?.choices?.[0]?.message?.content;
  if(typeof answer!=="string"||!answer.trim())return json({error:"回答が空でした"},502,origin);
- return json({answer,sources,literatureStatus,guidelines,abstracts:abstracts.map(a=>({pmid:a.pmid,available:true}))},200,origin);
+ return json({answer,sources,literatureStatus,guidelines,guidelineEvidenceStatus,guidelineEvidence:guidelineEvidence.map(x=>({id:x.id,url:x.url,scope:x.scope})),abstracts:abstracts.map(a=>({pmid:a.pmid,available:true}))},200,origin);
  }catch{return json({error:"AIサービスに接続できませんでした"},502,origin)}
 }};
