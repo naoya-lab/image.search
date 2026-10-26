@@ -19,9 +19,7 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <label for="category">専門分野</label><select id="category"><option>CT・CTA</option><option>MRI</option><option>一般撮影</option><option>透視</option><option>マンモグラフィ</option><option>画像物理・品質管理</option></select>
 <label for="question">質問（匿名化した一般的な内容のみ）</label>
 <textarea id="question" maxlength="3000" required placeholder="例：頭部CTAで造影タイミングが早すぎる場合に検討すべき原因は？"></textarea>
-<label for="accessToken">個人用アクセスキー（管理者が設定）</label><input id="accessToken" type="password" autocomplete="off" placeholder="CloudflareにSecretとして登録したアクセスキー"><p class="muted">このキーは端末に保存しません。GitHubや会話に貼り付けないでください。</p><label for="endpoint">APIのURL（管理者が設定）</label>
-<input id="endpoint" type="url" placeholder="https://your-worker.example.workers.dev/api/ask" autocomplete="off">
-<p class="muted">API URLはこの画面内でのみ使用し、端末に保存しません。未設定の場合は質問を送信しません。</p>
+<label for="accessToken">個人用アクセスキー（管理者が設定）</label><input id="accessToken" type="password" autocomplete="off" placeholder="CloudflareにSecretとして登録したアクセスキー"><p class="muted">このキーは端末に保存しません。GitHubや会話に貼り付けないでください。</p><p class="muted">接続先は放射線技師AI専用のCloudflare Workerに固定されています。アクセスキーは端末へ永続保存しません。</p>
 <button id="submit" type="submit">回答を生成</button> <button type="button" id="clear" style="background:#60758a">消去</button>
 <p id="status" role="status" aria-live="polite"></p></form></section>
 <section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="reply" class="reply"></div></section>
@@ -30,15 +28,15 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
 <li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
 <li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
-<footer>試験版 v0.1 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+<footer>試験版 v0.2 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
 </main><script>
 "use strict";
 const form=document.querySelector("#ask"),status=document.querySelector("#status"),reply=document.querySelector("#reply"),result=document.querySelector("#result"),submit=document.querySelector("#submit");
 document.querySelector("#clear").addEventListener("click",()=>{document.querySelector("#question").value="";reply.textContent="";result.classList.add("hide");status.textContent=""});
 form.addEventListener("submit",async(e)=>{
  e.preventDefault();const question=document.querySelector("#question").value.trim();
- const endpoint=document.querySelector("#endpoint").value.trim();
- const accessToken=document.querySelector("#accessToken").value.trim();if(!accessToken){status.textContent="個人用アクセスキーを入力してください。";return}\n if(!endpoint){status.textContent="管理者が用意したAPI URLを入力してください。";return}
+ const endpoint="https://radiographer-ai-api.zshijintian.workers.dev/api/ask";
+ const accessToken=document.querySelector("#accessToken").value.trim();if(!accessToken){status.textContent="個人用アクセスキーを入力してください。";return}\n // Endpoint is pinned to the dedicated Worker to avoid credential exfiltration.
  let url;try{url=new URL(endpoint);if(url.protocol!=="https:")throw Error()}catch{status.textContent="HTTPSのAPI URLを指定してください。";return}
  if(!question){return}if(/(?:患者(?:番号|ID|氏名)|カルテ番号|生年月日)\s*[:：]/i.test(question)){status.textContent="個人情報の可能性があります。匿名化してから質問してください。";return}
  submit.disabled=true;status.textContent="回答を生成中…";result.classList.add("hide");
