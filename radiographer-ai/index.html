@@ -58,7 +58,7 @@ form.addEventListener("submit",async e=>{
   // Link only references for which the server returned an abstract.
   reply.replaceChildren();
   const verified=new Set((Array.isArray(data.abstracts)?data.abstracts:[]).filter(p=>p.available===true).map(p=>String(p.pmid)));
-  const pattern=/PMID\\s*[:：#]?\\s*(\\d{5,9})/gi;
+  const pattern=/PMID\s*[:：#]?\s*(\d{5,9})/gi;
   let cursor=0,match;
   while((match=pattern.exec(data.answer))!==null){
     reply.append(document.createTextNode(data.answer.slice(cursor,match.index)));
