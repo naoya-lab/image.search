@@ -41,7 +41,7 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
 <li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
 <li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
-<footer>試験版 v1.0 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+<footer>試験版 v1.1 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
 </main><script>
 "use strict";
 const $=id=>document.getElementById(id);
@@ -57,8 +57,12 @@ function renderDiagram(question){
  let kind="";
  if(/ctdi|dlp/i.test(q))kind="ct";
  else if(/sar|rf加熱|高周波加熱/i.test(q)&&/mri|mr検査|rf|sar/i.test(q))kind="sar";
+ else if(/ttf|nps|detectability|d[′’\x27]|検出能|空間周波数/i.test(q))kind="quality";
+ else if(/t1|t2|強調画像|緩和時間/i.test(q)&&/mri|mr|t1|t2/i.test(q))kind="relax";
+ else if(/cta|造影タイミング|bolus|ボーラストラッキング|テストボーラス|動脈相|造影ピーク/i.test(q))kind="cta";
  if(!kind)return;
- add(node,"h3",kind==="ct"?"図で理解：CTDIvolとDLP":"図で理解：MRIのSARとRF加熱");
+ const titles={ct:"CTDIvolとDLP",sar:"MRIのSARとRF加熱",cta:"CTAの造影タイミング",relax:"MRIのT1/T2強調",quality:"TTF・NPS・検出能"};
+ add(node,"h3","図で理解："+titles[kind]);
  if(kind==="ct"){
   const grid=add(node,"div","","viz-grid");
   card(grid,"CTDIvol","標準ファントムを用いたCT線量指標。単位 mGy");
@@ -68,7 +72,7 @@ function renderDiagram(question){
   card(g,"CTDIvol","撮影方式や条件による線量指標","green");
   card(g,"DLP","スキャン範囲を考慮した線量指標","amber");
   add(node,"p","注意：CTDIvolもDLPも個々の患者が実際に受けた線量や実効線量そのものではありません。","viz-note");
- }else{
+ }else if(kind==="sar"){
   const grid=add(node,"div","","viz-grid");
   card(grid,"RF送信","MRIの励起パルスとしてRF電磁場を使用");
   card(grid,"エネルギー吸収","人体組織にRFエネルギーが吸収される","green");
@@ -77,6 +81,34 @@ function renderDiagram(question){
   card(g,"SAR","単位質量あたりのRF吸収電力。単位 W/kg","green");
   card(g,"注意点","実際の局所加熱は体格・コイル・シーケンス・医療機器などにも依存","amber");
   add(node,"p","注意：SARは温度上昇そのものではなく、表示値だけで局所的な熱傷リスクを保証できません。装置と条件に応じて安全管理が必要です。","viz-note");
+ }
+ else if(kind==="cta"){
+  const g=add(node,"div","","viz-grid");
+  card(g,"① 造影剤注入","注入時間・流量・ヨード量が時間濃度曲線を変化させる");
+  card(g,"② 体内移行","循環時間や心拍出量などで造影剤到達が変わる","green");
+  add(node,"div","注入開始 → 動脈到達 → 濃度上昇 → ピーク付近 → 減衰","viz-equation");
+  const h=add(node,"div","","viz-grid");
+  card(h,"ボーラストラッキング","ROIの閾値到達を検出し、設定遅延後にスキャン","green");
+  card(h,"テストボーラス","少量注入で時間濃度曲線を測り、本撮影の時刻を検討","amber");
+  add(node,"p","注意：閾値に達した時刻と目的血管のピーク時刻は同じではありません。装置の撮影時間や施設プロトコルも考慮します。","viz-note");
+ }else if(kind==="relax"){
+  const g=add(node,"div","","viz-grid");
+  card(g,"T1強調画像","一般に短いTR・短いTE。脂肪は高信号になりやすい");
+  card(g,"T2強調画像","一般に長いTR・長いTE。自由水は高信号になりやすい","green");
+  add(node,"div","TR：縦緩和（T1）の強調に関与 ／ TE：横緩和（T2）の強調に関与","viz-equation");
+  const h=add(node,"div","","viz-grid");
+  card(h,"T1：縦緩和","縦磁化の回復を反映","green");
+  card(h,"T2：横緩和","横磁化の位相分散を反映","amber");
+  add(node,"p","注意：模式的なSE系の説明です。GRE、IR、FSEなどでは信号やコントラストが条件によって異なります。","viz-note");
+ }else if(kind==="quality"){
+  const g=add(node,"div","","viz-grid");
+  card(g,"TTF","対象のコントラスト・再構成条件での空間分解能特性");
+  card(g,"NPS","ノイズの強度と空間周波数分布","green");
+  add(node,"div","タスク形状 + TTF + NPS + 観察者モデル → detectability index（d′）","viz-equation");
+  const h=add(node,"div","","viz-grid");
+  card(h,"TTF","信号の周波数成分がどれほど伝わるか","green");
+  card(h,"NPS","各周波数で信号を妨げるノイズの大きさ","amber");
+  add(node,"p","注意：d′の式は観察者モデル・タスク・正規化に依存します。TTFまたはNPSだけで検出能を断定できません。","viz-note");
  }
  add(node,"p","この図は事前に用意した一般教育用テンプレートです。AIが個別回答から自動生成・検証した図ではありません。","viz-note");
  node.classList.remove("hide");
