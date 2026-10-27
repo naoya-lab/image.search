@@ -10,6 +10,19 @@ label{display:block;font-weight:650;margin:14px 0 6px}input,select,textarea{widt
 textarea{min-height:150px;resize:vertical}button{border:0;background:#145997;color:white;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
 .warning{border-left:4px solid #af6c10;padding:12px;background:#fff8e9}.reply{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
 footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} .hide{display:none}
+
+.diagram{margin:16px 0;padding:16px;border:1px solid #bdd2e3;border-radius:16px;background:#f7fbff}
+.diagram h3{margin:0 0 12px;font-size:1.05rem}.viz-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.viz-card{border-radius:12px;padding:13px;background:#e7f1fc;border:1px solid #b9d4ef;min-width:0}
+.viz-card strong{display:block;color:#12476d;font-size:1.08rem}.viz-card small{display:block;margin-top:5px;line-height:1.5}
+.viz-card.green{background:#e7f6ed;border-color:#aedbc1}.viz-card.green strong{color:#18613e}
+.viz-card.amber{background:#fff2d8;border-color:#e9c77c}.viz-card.amber strong{color:#744b0b}
+.viz-card.red{background:#ffeded;border-color:#e6b9b9}.viz-card.red strong{color:#913c3c}
+.viz-equation{text-align:center;font-weight:800;background:white;border-radius:10px;padding:13px;margin:12px 0;border:1px dashed #92acc4;overflow-wrap:anywhere}
+.viz-arrow{text-align:center;color:#346b96;font-size:1.8rem;line-height:1.3}
+.diagram table{border-collapse:collapse;width:100%;font-size:.92rem}.diagram th,.diagram td{border:1px solid #cddbe6;padding:9px;text-align:left}.diagram th{background:#e7f1fc}
+.diagram .viz-note{font-size:.82rem;color:#4e6377;line-height:1.6;margin-top:12px}
+@media(max-width:440px){.viz-grid{grid-template-columns:1fr}.diagram{padding:12px}.diagram table{font-size:.82rem}}
 </style></head><body><main>
 <header><h1>放射線技師AI <small style="font-size:.65em">MVP</small></h1><p class="muted">撮影技術・画像物理・プロトコル検討を支援する試験版</p></header>
 <section class="warning" role="note"><strong>教育・研究用／臨床判断の代替には使用できません。</strong><br>
@@ -22,21 +35,55 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <label for="accessToken">個人用アクセスキー（管理者が設定）</label><input id="accessToken" type="password" autocomplete="off" placeholder="CloudflareにSecretとして登録したアクセスキー"><p class="muted">このキーは端末に保存しません。GitHubや会話に貼り付けないでください。</p><p class="muted">接続先は放射線技師AI専用のCloudflare Workerに固定されています。アクセスキーは端末へ永続保存しません。</p>
 <label style="font-weight:normal"><input id="searchGuidelines" type="checkbox" checked style="width:auto"> 該当する公式ガイドラインの一部を確認する（CT被ばく・MRI安全性の試験機能）</label><label style="font-weight:normal"><input id="searchPubmed" type="checkbox" checked style="width:auto"> PubMedで関連論文の書誌情報を検索する</label><button id="submit" type="submit">回答を生成</button> <button type="button" id="clear" style="background:#60758a">消去</button><p class="muted">送信した質問は外部AIサービスで処理されます。匿名化は自動的には保証されません。</p>
 <p id="status" role="status" aria-live="polite"></p></form></section>
-<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="reply" class="reply"></div><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p><ul id="guidelineEvidenceList"></ul></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">リンクになったPMIDは抄録を取得した論文です。回答の各主張との一致は未検証です。リンクにならない出典は未確認です。下の公的資料で確認してください。</p></section>
+<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><div id="diagram" class="diagram hide" aria-label="図解による説明"></div><div id="reply" class="reply"></div><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p><ul id="guidelineEvidenceList"></ul></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">リンクになったPMIDは抄録を取得した論文です。回答の各主張との一致は未検証です。リンクにならない出典は未確認です。下の公的資料で確認してください。</p></section>
 <section class="panel"><h2>参考にする公的な情報源</h2><p class="muted">以下は情報源の入口です。AIの個別回答に対する出典の自動照合は初期版では未実装です。</p>
 <ul><li><a href="https://www.mhlw.go.jp/" target="_blank" rel="noopener noreferrer">厚生労働省</a></li>
 <li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
 <li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
 <li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
-<footer>試験版 v0.9 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+<footer>試験版 v1.0 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
 </main><script>
 "use strict";
 const $=id=>document.getElementById(id);
 const form=$("ask"),status=$("status"),reply=$("reply"),result=$("result"),submit=$("submit");
 const API="https://radiographer-ai-api.zshijintian.workers.dev/api/ask";
 let pending=false;
+
+function renderDiagram(question){
+ const node=$("diagram");node.replaceChildren();node.classList.add("hide");
+ const add=(parent,tag,text,cls)=>{const el=document.createElement(tag);if(cls)el.className=cls;el.textContent=text;parent.append(el);return el;};
+ const card=(parent,heading,detail,cls)=>{const el=add(parent,"div","","viz-card"+(cls?" "+cls:""));add(el,"strong",heading);add(el,"small",detail);};
+ const q=question.toLowerCase();
+ let kind="";
+ if(/ctdi|dlp/i.test(q))kind="ct";
+ else if(/sar|rf加熱|高周波加熱/i.test(q)&&/mri|mr検査|rf|sar/i.test(q))kind="sar";
+ if(!kind)return;
+ add(node,"h3",kind==="ct"?"図で理解：CTDIvolとDLP":"図で理解：MRIのSARとRF加熱");
+ if(kind==="ct"){
+  const grid=add(node,"div","","viz-grid");
+  card(grid,"CTDIvol","標準ファントムを用いたCT線量指標。単位 mGy");
+  card(grid,"撮影長","照射範囲の長さ。単位 cm","green");
+  add(node,"div","CTDIvol（mGy）× 撮影長（cm）＝ DLP（mGy・cm）","viz-equation");
+  const g=add(node,"div","","viz-grid");
+  card(g,"CTDIvol","撮影方式や条件による線量指標","green");
+  card(g,"DLP","スキャン範囲を考慮した線量指標","amber");
+  add(node,"p","注意：CTDIvolもDLPも個々の患者が実際に受けた線量や実効線量そのものではありません。","viz-note");
+ }else{
+  const grid=add(node,"div","","viz-grid");
+  card(grid,"RF送信","MRIの励起パルスとしてRF電磁場を使用");
+  card(grid,"エネルギー吸収","人体組織にRFエネルギーが吸収される","green");
+  add(node,"div","RFエネルギー吸収 → SAR（W/kg） → 温度上昇リスクの評価","viz-equation");
+  const g=add(node,"div","","viz-grid");
+  card(g,"SAR","単位質量あたりのRF吸収電力。単位 W/kg","green");
+  card(g,"注意点","実際の局所加熱は体格・コイル・シーケンス・医療機器などにも依存","amber");
+  add(node,"p","注意：SARは温度上昇そのものではなく、表示値だけで局所的な熱傷リスクを保証できません。装置と条件に応じて安全管理が必要です。","viz-note");
+ }
+ add(node,"p","この図は事前に用意した一般教育用テンプレートです。AIが個別回答から自動生成・検証した図ではありません。","viz-note");
+ node.classList.remove("hide");
+}
+
 $("examples").addEventListener("change",()=>{if($("examples").value)$("question").value=$("examples").value;});
-$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineEvidenceList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
+$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("diagram").replaceChildren();$("diagram").classList.add("hide");$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineEvidenceList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
 $("copyAnswer").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(reply.textContent);status.textContent="回答をコピーしました。";}catch{status.textContent="コピーできませんでした。回答文を選択してコピーしてください。";}});
 form.addEventListener("submit",async e=>{
  e.preventDefault();
@@ -70,6 +117,7 @@ form.addEventListener("submit",async e=>{
     cursor=pattern.lastIndex;
   }
   reply.append(document.createTextNode(data.answer.slice(cursor)));
+  renderDiagram(question);
   const papers=Array.isArray(data.sources)?data.sources:[];
   $("sourceList").replaceChildren();
   for(const p of papers){
