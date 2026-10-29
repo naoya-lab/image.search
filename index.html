@@ -6568,5 +6568,8 @@
       });
     }
   </script>
+
+<style id="safe-update-style">#safe-app-update{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:2147483640;background:#176e78;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 14px;font:600 13px -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;box-shadow:0 3px 15px #0005;cursor:pointer}#safe-update[disabled]{opacity:.7}</style>
+<script id="safe-update-script">(function(){'use strict';function setup(){if(document.getElementById('safe-app-update'))return;const b=document.createElement('button');b.type='button';b.id='safe-app-update';b.textContent='↻ アップデート確認';b.setAttribute('aria-label','アプリの最新版を確認して再読み込み');document.body.appendChild(b);b.addEventListener('click',async function(){if(!navigator.onLine){alert('オフラインです。ネット接続後に再度お試しください。');return;}b.disabled=true;b.textContent='更新を確認中…';try{if('serviceWorker' in navigator){const reg=await navigator.serviceWorker.getRegistration();if(reg){await Promise.race([reg.update(),new Promise(resolve=>setTimeout(resolve,7000))]);}}const u=new URL(location.href);u.searchParams.set('_app_refresh',Date.now().toString());const response=await fetch(u.href,{cache:'no-store',redirect:'follow'});if(!response.ok)throw new Error('HTTP '+response.status);location.replace(u.href);}catch(err){b.disabled=false;b.textContent='↻ アップデート確認';alert('更新を確認できませんでした。通信状態をご確認ください。');}});}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();})();</script>
 </body>
 </html>
