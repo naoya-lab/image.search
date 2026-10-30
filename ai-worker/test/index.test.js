@@ -78,7 +78,7 @@ test('transcribes an image through Gemini without returning an interpretation', 
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async (url, options) => {
-    assert.match(String(url), /generativelanguage\\.googleapis\\.com\\/v1beta\\/models\\/gemini-3\\.1-flash-lite:generateContent$/);
+    assert.match(String(url), /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-3\.1-flash-lite:generateContent$/);
     assert.equal(options.headers['x-goog-api-key'], 'test-key');
     const body = JSON.parse(options.body);
     assert.match(body.systemInstruction.parts[0].text, /文字起こし/);
@@ -93,6 +93,26 @@ test('transcribes an image through Gemini without returning an interpretation', 
 test('rejects unsupported image mime types before calling Gemini', async () => {
   const response = await worker.fetch(makeRequest({ imageBase64: 'aGVsbG8=', mimeType: 'text/plain' }, { path: '/transcribe' }), makeEnv());
   assert.equal(response.status, 400);
+});
+
+test('rejects non-object JSON on every POST endpoint without throwing', async () => {
+  for (const path of ['/normalize', '/extract-terms', '/transcribe', '/transcribe-protocol']) {
+    for (const body of [null, [], 'text', 123, true]) {
+      const response = await worker.fetch(makeRequest(body, { path }), makeEnv());
+      assert.equal(response.status, 400, `${path}: ${JSON.stringify(body)}`);
+      assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://naoya-lab.github.io');
+      assert.equal(typeof (await response.json()).error, 'string');
+    }
+  }
+});
+
+test('handles a null structured extraction result without throwing', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => Response.json({ candidates: [{ content: { parts: [{ text: 'null' }] } }] });
+  const response = await worker.fetch(makeRequest({ text: '頭痛' }, { path: '/extract-terms' }), makeEnv());
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { terms: [] });
 });
 
 test('answers preflight requests with the allowed origin', async () => {
