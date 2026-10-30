@@ -40,7 +40,7 @@ export const CANONICAL_TERMS = new Set([
   "関節腫脹", "四肢痛", "突然の激しい頭痛", "今までで最悪の頭痛", "人生最悪の頭痛", "急に起きた激しい頭痛", "急性腎盂腎炎",
   "腎盂腎炎", "腎盂腎炎疑い", "急性胆嚢炎", "急性胆嚢炎疑い", "胆嚢炎", "胆嚢炎疑い", "Murphy徴候",
   "Murphyサイン", "右季肋部痛", "右上腹部痛", "妊娠中", "妊婦", "妊娠", "急性腹症",
-  "妊娠中の腹痛", "妊婦の腹痛", "妊娠中の急性腹症", "妊婦の急性腹症", "Adamkiewicz動脈", "アダムキュービッツ動脈", "大前根髄動脈",
+  "妊娠中の腹痛", "妊婦の腹痛", "妊娠中の急性腹症", "妊婦の急性腹症", "Adamkiewicz動脈", "アダムキュービッツ動脈", "アダムキエビッツ動脈", "アダムキービッツ動脈", "Adamkiewicz artery", "大前根髄質動脈", "大前根髄動脈",
   "胸部大動脈瘤", "胸腹部大動脈瘤", "術前", "大動脈瘤術前", "ステントグラフト内挿術", "RCVS", "可逆性脳血管攣縮症候群",
   "雷鳴頭痛で発症", "脳血管攣縮", "動脈解離", "脳動脈解離", "頭蓋内動脈解離", "椎骨動脈解離", "頸動脈解離",
   "頚動脈解離", "解離性動脈瘤", "脳静脈洞血栓症", "静脈洞血栓", "脳静脈血栓症", "皮質静脈血栓症", "CVT",
@@ -155,6 +155,9 @@ export default {
       } catch {
         return json({ error: 'JSON形式のリクエストを確認してください。' }, 400, origin);
       }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json({ error: 'JSONオブジェクトを送信してください。' }, 400, origin);
+      }
       const imageBase64 = typeof body.imageBase64 === 'string' ? body.imageBase64 : '';
       const mimeType = body.mimeType;
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !imageBase64 || imageBase64.length > 4_100_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
@@ -221,6 +224,9 @@ export default {
       body = JSON.parse(raw);
     } catch {
       return json({ error: 'JSON形式のリクエストを確認してください。' }, 400, origin);
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json({ error: 'JSONオブジェクトを送信してください。' }, 400, origin);
     }
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     if (!text || text.length > 4000) return json({ error: '依頼文は1〜4000文字で入力してください。' }, 400, origin);
@@ -345,7 +351,7 @@ export default {
 
     const normalizedSource = normalize(text);
     const allowedCategories = new Set(['symptom', 'disease', 'injury', 'anatomy', 'exam_purpose', 'other']);
-    const terms = (Array.isArray(result.terms) ? result.terms : []).flatMap((item) => {
+    const terms = (Array.isArray(result?.terms) ? result.terms : []).flatMap((item) => {
       if (!item || typeof item.sourcePhrase !== 'string' || typeof item.canonicalTerm !== 'string') return [];
       const sourcePhrase = item.sourcePhrase.trim().slice(0, 100);
       const canonicalTerm = item.canonicalTerm.trim();
