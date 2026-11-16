@@ -35,19 +35,68 @@ footer{color:#526577;font-size:.83rem}a{color:#12558b}#status{min-height:1.5em} 
 <label for="accessToken">個人用アクセスキー（管理者が設定）</label><input id="accessToken" type="password" autocomplete="off" placeholder="CloudflareにSecretとして登録したアクセスキー"><p class="muted">このキーは端末に保存しません。GitHubや会話に貼り付けないでください。</p><p class="muted">接続先は放射線技師AI専用のCloudflare Workerに固定されています。アクセスキーは端末へ永続保存しません。</p>
 <label style="font-weight:normal"><input id="searchGuidelines" type="checkbox" checked style="width:auto"> 該当する公式ガイドラインの一部を確認する（CT被ばく・MRI安全性の試験機能）</label><label style="font-weight:normal"><input id="searchPubmed" type="checkbox" checked style="width:auto"> PubMedで関連論文の書誌情報を検索する</label><button id="submit" type="submit">回答を生成</button> <button type="button" id="clear" style="background:#60758a">消去</button><p class="muted">送信した質問は外部AIサービスで処理されます。匿名化は自動的には保証されません。</p>
 <p id="status" role="status" aria-live="polite"></p></form></section>
-<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><section id="billing" class="diagram hide" aria-label="モデルと推定料金"><h3>AIモデル・今回の利用料金</h3><p id="billingModel"></p><p id="billingCost"></p><p id="billingTokens" class="muted"></p><p class="viz-note">APIの使用トークン数から計算した推定料金（米ドル）です。実際の請求額・為替レート・その他の費用と一致するとは限りません。</p></section><div id="diagram" class="diagram hide" aria-label="図解による説明"></div><div id="reply" class="reply"></div><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p><ul id="guidelineEvidenceList"></ul></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">リンクになったPMIDは抄録を取得した論文です。回答の各主張との一致は未検証です。リンクにならない出典は未確認です。下の公的資料で確認してください。</p></section>
-<section class="panel"><h2>参考にする公的な情報源</h2><p class="muted">以下は情報源の入口です。AIの個別回答に対する出典の自動照合は初期版では未実装です。</p>
+<section class="panel hide" id="result"><h2>AIの回答（必ず専門職が検証）</h2><section id="billing" class="diagram hide" aria-label="モデルと推定料金"><h3>AIモデル・今回の利用料金</h3><p id="billingModel"></p><p id="billingCost"></p><p id="billingTokens" class="muted"></p><p class="viz-note">APIの使用トークン数から計算した推定料金（米ドル）です。実際の請求額・為替レート・その他の費用と一致するとは限りません。</p></section><div id="diagram" class="diagram hide" aria-label="図解による説明"></div><div id="reply" class="reply"></div><section id="knowledgeUsed" class="hide"><h2>今回参照した承認済み知識</h2><ul id="knowledgeUsedList"></ul><p class="muted">登録時点の内容です。最新の資料本文と照合したことを意味しません。</p></section><section id="citations" class="hide"><h2>PubMedで実在を確認した文献</h2><p class="muted">論文の存在・書誌情報を照合し、取得可能な場合は抄録もAIの参考にしています。ガイドライン本文や論文本文は未取得で、回答内容との一致は保証されません。</p><ul id="sourceList"></ul><p id="literatureStatus" class="muted"></p></section><section id="guidelineSources" class="hide"><h2>公式CT・MRIガイドライン</h2><p class="muted">学会公式サイトへの案内です。本文をAIが読んだ・照合したという意味ではありません。リンク先で最新版と該当箇所を確認してください。</p><ul id="guidelineList"></ul><p id="guidelineEvidenceStatus" class="muted"></p><ul id="guidelineEvidenceList"></ul></section><p><button type="button" id="copyAnswer" style="background:#60758a">回答をコピー</button></p><p class="muted">リンクになったPMIDは抄録を取得した論文です。回答の各主張との一致は未検証です。リンクにならない出典は未確認です。下の公的資料で確認してください。</p></section>
+<section class="panel" id="knowledgeManager"><h2>承認済み知識データベース</h2>
+<p class="muted">登録した知識はCloudflare D1に保存され、次回以降の回答に利用されます。自動学習はしません。患者情報・有料書籍の転載・秘密情報は登録しないでください。</p>
+<label for="knowledgeTitle">知識のタイトル</label><input id="knowledgeTitle" maxlength="160" placeholder="例：CTDIvolとDLPの関係">
+<label for="knowledgeBody">確認済みの知識（自分の言葉で要約）</label><textarea id="knowledgeBody" maxlength="2500" placeholder="ガイドライン原文を確認したうえで、短く記述してください。"></textarea>
+<label for="knowledgeSourceLabel">出典名</label><input id="knowledgeSourceLabel" maxlength="200" placeholder="例：学会ガイドライン・該当章">
+<label for="knowledgeSourceUrl">出典のHTTPS URL</label><input id="knowledgeSourceUrl" type="url" placeholder="https://...">
+<label for="knowledgeSourceDate">出典の公開・確認日（任意）</label><input id="knowledgeSourceDate" maxlength="40" placeholder="例：2026-11-16">
+<label style="font-weight:normal"><input id="knowledgeConfirmed" type="checkbox" style="width:auto"> 内容と出典を確認し、登録することを承認します</label>
+<button id="knowledgeSave" type="button">承認済み知識を保存</button>
+<button id="knowledgeRefresh" type="button" style="background:#60758a">保存済み一覧</button>
+<p id="knowledgeStatus" role="status" aria-live="polite"></p><ul id="knowledgeList"></ul>
+</section><section class="panel"><h2>参考にする公的な情報源</h2><p class="muted">以下は情報源の入口です。AIの個別回答に対する出典の自動照合は初期版では未実装です。</p>
 <ul><li><a href="https://www.mhlw.go.jp/" target="_blank" rel="noopener noreferrer">厚生労働省</a></li>
 <li><a href="https://www.pmda.go.jp/" target="_blank" rel="noopener noreferrer">PMDA</a></li>
 <li><a href="https://www.jart.jp/" target="_blank" rel="noopener noreferrer">日本診療放射線技師会</a></li>
 <li><a href="https://www.acr.org/Clinical-Resources/ACR-Appropriateness-Criteria" target="_blank" rel="noopener noreferrer">ACR Appropriateness Criteria</a></li></ul></section>
-<footer>試験版 v1.2 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
+<footer>試験版 v1.3 ｜診断支援としての性能検証・医療機器該当性の確認は未完了。</footer>
 </main><script>
 "use strict";
 const $=id=>document.getElementById(id);
 const form=$("ask"),status=$("status"),reply=$("reply"),result=$("result"),submit=$("submit");
 const API="https://radiographer-ai-api.zshijintian.workers.dev/api/ask";
 let pending=false;
+
+const KNOWLEDGE_API="https://radiographer-ai-api.zshijintian.workers.dev/api/knowledge";
+async function knowledgeCall(payload){
+ const token=$("accessToken").value.trim();
+ if(!token)throw new Error("先に個人用アクセスキーを入力してください");
+ const response=await fetch(KNOWLEDGE_API,{method:"POST",headers:{"Content-Type":"application/json","X-Access-Token":token},body:JSON.stringify(payload),cache:"no-store",credentials:"omit"});
+ const data=await response.json();
+ if(!response.ok)throw new Error(data.error||"知識DBのAPIエラー");
+ return data;
+}
+async function refreshKnowledge(){
+ $("knowledgeStatus").textContent="保存済み知識を読み込み中…";
+ try{
+ const data=await knowledgeCall({action:"list"});$("knowledgeList").replaceChildren();
+ for(const item of data.entries||[]){
+  const li=document.createElement("li"),strong=document.createElement("strong"),desc=document.createElement("p"),link=document.createElement("a"),archive=document.createElement("button");
+  strong.textContent=item.title+"（"+item.category+"／"+item.status+"）";
+  desc.textContent=item.body;link.href=item.source_url;link.target="_blank";link.rel="noopener noreferrer";link.textContent=item.source_label;
+  archive.type="button";archive.style.background="#60758a";archive.textContent="アーカイブ";
+  archive.disabled=item.status!=="approved";
+  archive.addEventListener("click",async()=>{if(!confirm("この知識を回答対象から外しますか？"))return;try{await knowledgeCall({action:"archive",id:item.id});await refreshKnowledge();}catch(e){$("knowledgeStatus").textContent=e.message;}});
+  li.append(strong,desc,link,document.createTextNode(" "),archive);$("knowledgeList").append(li);
+ }
+ $("knowledgeStatus").textContent="登録件数："+(data.entries||[]).length;
+ }catch(e){$("knowledgeStatus").textContent=e.message;}
+}
+$("knowledgeRefresh").addEventListener("click",refreshKnowledge);
+$("knowledgeSave").addEventListener("click",async()=>{
+ if(!$("knowledgeConfirmed").checked){$("knowledgeStatus").textContent="出典を確認し、承認にチェックしてください";return;}
+ $("knowledgeSave").disabled=true;$("knowledgeStatus").textContent="保存中…";
+ try{
+ await knowledgeCall({action:"add",category:$("category").value,title:$("knowledgeTitle").value,body:$("knowledgeBody").value,sourceLabel:$("knowledgeSourceLabel").value,sourceUrl:$("knowledgeSourceUrl").value,sourceDate:$("knowledgeSourceDate").value,confirmed:true});
+ $("knowledgeStatus").textContent="知識を保存しました。";$("knowledgeConfirmed").checked=false;
+ await refreshKnowledge();
+ }catch(e){$("knowledgeStatus").textContent=e.message;}
+ finally{$("knowledgeSave").disabled=false;}
+});
+
 
 function renderDiagram(question){
  const node=$("diagram");node.replaceChildren();node.classList.add("hide");
@@ -115,7 +164,7 @@ function renderDiagram(question){
 }
 
 $("examples").addEventListener("change",()=>{if($("examples").value)$("question").value=$("examples").value;});
-$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("diagram").replaceChildren();$("diagram").classList.add("hide");$("billing").classList.add("hide");$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineEvidenceList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
+$("clear").addEventListener("click",()=>{$("question").value="";$("accessToken").value="";reply.textContent="";$("knowledgeUsedList").replaceChildren();$("knowledgeUsed").classList.add("hide");$("diagram").replaceChildren();$("diagram").classList.add("hide");$("billing").classList.add("hide");$("sourceList").replaceChildren();$("citations").classList.add("hide");$("guidelineList").replaceChildren();$("guidelineEvidenceList").replaceChildren();$("guidelineSources").classList.add("hide");result.classList.add("hide");status.textContent="";$("examples").value="";});
 $("copyAnswer").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(reply.textContent);status.textContent="回答をコピーしました。";}catch{status.textContent="コピーできませんでした。回答文を選択してコピーしてください。";}});
 form.addEventListener("submit",async e=>{
  e.preventDefault();
@@ -154,6 +203,12 @@ form.addEventListener("submit",async e=>{
   $("billingCost").textContent=b.available&&Number.isFinite(Number(b.estimatedUsd))?"今回の推定API料金：$"+Number(b.estimatedUsd).toFixed(6):"今回の料金：算出できません（単価または利用量の情報なし）";
   $("billingTokens").textContent=b.available?"入力 "+b.inputTokens+" token（キャッシュ "+b.cachedInputTokens+"）／出力 "+b.outputTokens+" token":"";
   $("billing").classList.remove("hide");
+  $("knowledgeUsedList").replaceChildren();
+  for(const item of (Array.isArray(data.knowledgeUsed)?data.knowledgeUsed:[])){
+    const li=document.createElement("li"),a=document.createElement("a");
+    a.textContent=item.title||item.sourceLabel||"承認済み知識";a.href=item.sourceUrl;a.target="_blank";a.rel="noopener noreferrer";li.append(a);$("knowledgeUsedList").append(li);
+  }
+  $("knowledgeUsed").classList.toggle("hide",!$("knowledgeUsedList").children.length);
   renderDiagram(question);
   const papers=Array.isArray(data.sources)?data.sources:[];
   $("sourceList").replaceChildren();
